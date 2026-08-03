@@ -1,0 +1,92 @@
+{
+  "family": "dinebuddy-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/dinebuddyTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "dinebuddy-backend",
+      "image": "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/dinebuddy:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp",
+          "name": "http"
+        }
+      ],
+      "environment": [
+        {
+          "name": "ENVIRONMENT",
+          "value": "production"
+        },
+        {
+          "name": "PROJECT_NAME",
+          "value": "DineBuddy"
+        },
+        {
+          "name": "API_V1_PREFIX",
+          "value": "/api/v1"
+        },
+        {
+          "name": "POSTGRES_PORT",
+          "value": "5432"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "us-east-1"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "POSTGRES_USER",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:dinebuddy/prod/db:username::"
+        },
+        {
+          "name": "POSTGRES_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:dinebuddy/prod/db:password::"
+        },
+        {
+          "name": "POSTGRES_HOST",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:dinebuddy/prod/db:host::"
+        },
+        {
+          "name": "POSTGRES_DB",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:dinebuddy/prod/db:dbname::"
+        },
+        {
+          "name": "SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:dinebuddy/prod/app:SECRET_KEY::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/dinebuddy-backend",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:8000/api/v1/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "command": [
+        "sh",
+        "-c",
+        "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+      ]
+    }
+  ]
+}
+

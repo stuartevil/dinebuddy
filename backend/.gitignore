@@ -1,0 +1,83 @@
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.Python
+
+# Virtual Environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# ============================================
+# Environment Variables (SENSITIVE!)
+# ============================================
+.env
+.env.local
+.env.production
+.env.staging
+.env.development
+
+# ============================================
+# Database
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# ============================================
+# IDE & Editors
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ============================================
+# Testing & Coverage
+# ============================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+.hypothesis/
+.tox/
+.nox/
+
+# ============================================
+# Alembic Migrations
+# ============================================
+# ⚠️ IMPORTANT: Migration files MUST be committed!
+# Only ignore pycache from versions directory
+alembic/versions/__pycache__/
+
+# ============================================
+# Logs
+# ============================================
+*.log
+logs/
+
+# ============================================
+# FastAPI Specific
+# ============================================
+# If using uploaded files
+uploads/
+media/
+
+# If generating OpenAPI specs
+openapi.json
+openapi.yaml
+

@@ -1,0 +1,48 @@
+# Production Docker Compose Configuration
+# Use this for deploying on AWS EC2 or any cloud VM
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dinebuddy-backend-prod
+    restart: always
+    environment:
+      # These should come from environment variables on the host
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - PROJECT_NAME=${PROJECT_NAME:-DineBuddy}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - SECRET_KEY=${SECRET_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    command: >
+      sh -c "
+        echo '⏳ Waiting for database connection...' &&
+        sleep 5 &&
+        echo '🔄 Running Alembic migrations...' &&
+        alembic upgrade head &&
+        echo '🚀 Starting production server...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+      "
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Note: Database is not included in production compose
+# Use AWS RDS or managed PostgreSQL service instead
+

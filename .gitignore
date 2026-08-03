@@ -1,0 +1,131 @@
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.Python
+
+# Virtual Environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.virtualenv/
+
+# ============================================
+# Environment Variables (SENSITIVE!)
+# ============================================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.development
+
+# ============================================
+# Database
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# PostgreSQL local data (if running without Docker)
+pgdata/
+postgres-data/
+
+# ============================================
+# IDE & Editors
+# ============================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============================================
+# Testing & Coverage
+# ============================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ============================================
+# Logs
+# ============================================
+*.log
+logs/
+*.log.*
+
+# ============================================
+# Docker
+# ============================================
+# Allow override for local customizations
+docker-compose.override.yml
+
+# ============================================
+# OS Generated
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ============================================
+# AWS & Terraform
+# ============================================
+# Terraform state files (if using Terraform)
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+
+# AWS credentials (should use AWS CLI config instead)
+aws-credentials.json
+
+# ============================================
+# Application Specific
+# ============================================
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Uploads/Media (if applicable)
+uploads/
+media/
+
+# Static files (if collected)
+staticfiles/
+static_collected/

@@ -1,0 +1,12 @@
+# Terraform Variables
+# Copy this file to terraform.tfvars and update values
+
+aws_region = "us-east-1"
+environment = "production"
+app_name = "dinebuddy"
+
+# This will be updated by CI/CD or manually
+container_image = "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/dinebuddy:latest"
+
+db_username = "dinebuddy_admin"
+

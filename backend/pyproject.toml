@@ -1,0 +1,13 @@
+[project]
+name = "dinebuddy-backend"
+version = "0.1.0"
+description = "DineBuddy Restaurant Management API"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = ["ignore::DeprecationWarning"]
