@@ -144,6 +144,36 @@ class BillingService:
 
         return order
 
+    @staticmethod
+    def update_order_status(
+        db: Session,
+        order_id: int,
+        new_status: OrderStatus,
+        cancellation_reason: Optional[str] = None
+    ) -> Order:
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Order ID #{order_id} not found."
+            )
+
+        order.status = new_status
+        if new_status == OrderStatus.CANCELLED:
+            order.cancellation_reason = cancellation_reason or "Cancelled by user"
+
+        db.commit()
+        db.refresh(order)
+
+        # Recalculate session running bill if session exists
+        if order.table_session_id:
+            session = db.query(TableSession).filter(TableSession.id == order.table_session_id).first()
+            if session:
+                BillingService._recalculate_session_totals(db, session)
+                db.commit()
+
+        return order
+
 
     @staticmethod
     def _recalculate_session_totals(db: Session, session: TableSession):

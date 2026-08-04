@@ -1,21 +1,51 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { DEMO_DATA } from '../../services/apiClient';
-import { Layers, Clock, CheckCircle2, Eye, CreditCard } from 'lucide-react';
+import { api, DEMO_DATA } from '../../services/apiClient';
+import { Layers, Clock, CheckCircle2, Eye, CreditCard, XCircle, AlertTriangle, X } from 'lucide-react';
 
 export const OrdersModule = () => {
   const { addToast } = useAuth();
   const [activeTab, setActiveTab] = useState('All');
   const [orders, setOrders] = useState(DEMO_DATA.orders);
+  
+  // Cancel Order Modal State
+  const [cancellingOrder, setCancellingOrder] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
 
-  const handleUpdateStatus = (id, newStatus) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
-    addToast('info', 'Order Status Updated', `Order ${id} marked as ${newStatus}`);
+  const handleUpdateStatus = async (id, newStatus, reason = '') => {
+    try {
+      await api.patch(`/orders/${id}/status`, {
+        status: newStatus,
+        cancellation_reason: reason || undefined,
+      });
+    } catch {
+      // Fallback locally for demo mode
+    }
+
+    setOrders(prev => prev.map(o => o.id === id ? { 
+      ...o, 
+      status: newStatus,
+      cancellation_reason: reason || o.cancellation_reason,
+    } : o));
+
+    addToast(newStatus === 'cancelled' ? 'error' : 'info', 
+      newStatus === 'cancelled' ? 'Order Cancelled' : 'Order Status Updated', 
+      `Order ${id} ${newStatus === 'cancelled' ? `cancelled (${reason || 'No reason specified'})` : `marked as ${newStatus}`}`
+    );
+  };
+
+  const submitCancellation = (e) => {
+    e.preventDefault();
+    if (!cancellingOrder) return;
+    handleUpdateStatus(cancellingOrder.id, 'cancelled', cancelReason.trim() || 'Cancelled by staff');
+    setCancellingOrder(null);
+    setCancelReason('');
   };
 
   const filteredOrders = orders.filter(o => {
     if (activeTab === 'All') return true;
-    return o.status === activeTab.toLowerCase().replace(/\s+/g, '_');
+    const targetStatus = activeTab.toLowerCase().replace(/\s+/g, '_');
+    return o.status === targetStatus;
   });
 
   return (
@@ -30,14 +60,14 @@ export const OrdersModule = () => {
 
       {/* Tabs Filter */}
       <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-        {['All', 'Pending', 'In Kitchen', 'Ready', 'Served', 'Completed', 'Cancelled'].map(tab => (
+        {['All', 'Pending', 'In Kitchen', 'Ready', 'Served', 'Cancelled'].map(tab => (
           <button 
             key={tab} 
             onClick={() => setActiveTab(tab)}
-            className={`btn btn-sm ${activeTab === tab ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn btn-sm ${activeTab === tab ? (tab === 'Cancelled' ? 'btn-danger' : 'btn-primary') : 'btn-secondary'}`}
             style={{ borderRadius: '9999px' }}
           >
-            {tab}
+            {tab === 'Cancelled' ? `🚫 Cancelled (${orders.filter(o => o.status === 'cancelled').length})` : tab}
           </button>
         ))}
       </div>
@@ -50,14 +80,21 @@ export const OrdersModule = () => {
           </div>
         ) : (
           filteredOrders.map(order => (
-            <div key={order.id} className="panel-card" style={{ padding: '1.25rem' }}>
+            <div key={order.id} className="panel-card" style={{ 
+              padding: '1.25rem',
+              borderLeft: order.status === 'cancelled' ? '4px solid var(--danger)' : '1px solid var(--border-color)',
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <div>
                   <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>{order.id}</span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Table: {order.table_number} • {order.time}</span>
                 </div>
-                <span className={`badge ${order.status === 'pending' ? 'badge-warning' : order.status === 'in_kitchen' ? 'badge-info' : 'badge-success'}`}>
-                  {order.status}
+                <span className={`badge ${
+                  order.status === 'cancelled' ? 'badge-danger' :
+                  order.status === 'pending' ? 'badge-warning' : 
+                  order.status === 'in_kitchen' ? 'badge-info' : 'badge-success'
+                }`}>
+                  {order.status.toUpperCase()}
                 </span>
               </div>
 
@@ -71,26 +108,39 @@ export const OrdersModule = () => {
                 ))}
               </div>
 
+              {order.status === 'cancelled' && (
+                <div style={{ padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', fontSize: '0.78rem', color: 'var(--danger)', marginBottom: '0.85rem' }}>
+                  <strong>Cancellation Reason:</strong> {order.cancellation_reason || 'Customer requested / Out of stock'}
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 800, fontSize: '1rem', marginBottom: '1rem' }}>
                 <span>Total ({order.payment})</span>
-                <span style={{ color: 'var(--success)' }}>₹{order.total.toFixed(2)}</span>
+                <span style={{ color: order.status === 'cancelled' ? 'var(--text-muted)' : 'var(--success)', textDecoration: order.status === 'cancelled' ? 'line-through' : 'none' }}>
+                  ₹{order.total.toFixed(2)}
+                </span>
               </div>
 
-              {/* Action Steppers */}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {/* Action Steppers & Cancel Button */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {order.status === 'pending' && (
-                  <button onClick={() => handleUpdateStatus(order.id, 'in_kitchen')} className="btn btn-primary btn-sm" style={{ width: '100%' }}>
+                  <button onClick={() => handleUpdateStatus(order.id, 'in_kitchen')} className="btn btn-primary btn-sm" style={{ flex: 1 }}>
                     Send to Kitchen
                   </button>
                 )}
                 {order.status === 'in_kitchen' && (
-                  <button onClick={() => handleUpdateStatus(order.id, 'ready')} className="btn btn-success btn-sm" style={{ width: '100%' }}>
+                  <button onClick={() => handleUpdateStatus(order.id, 'ready')} className="btn btn-success btn-sm" style={{ flex: 1 }}>
                     Mark Ready
                   </button>
                 )}
                 {order.status === 'ready' && (
-                  <button onClick={() => handleUpdateStatus(order.id, 'served')} className="btn btn-success btn-sm" style={{ width: '100%' }}>
+                  <button onClick={() => handleUpdateStatus(order.id, 'served')} className="btn btn-success btn-sm" style={{ flex: 1 }}>
                     Mark Served
+                  </button>
+                )}
+                {order.status !== 'cancelled' && order.status !== 'served' && (
+                  <button onClick={() => setCancellingOrder(order)} className="btn btn-danger btn-sm" style={{ padding: '0.4rem 0.75rem' }} title="Cancel Order">
+                    <XCircle size={14} /> Cancel
                   </button>
                 )}
               </div>
@@ -98,6 +148,49 @@ export const OrdersModule = () => {
           ))
         )}
       </div>
+
+      {/* Cancel Order Reason Modal */}
+      {cancellingOrder && (
+        <div className="modal-backdrop">
+          <div className="modal-box" style={{ maxWidth: '420px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1.1rem', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertTriangle size={18} /> Cancel Order {cancellingOrder.id}?
+              </h3>
+              <button onClick={() => setCancellingOrder(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+              Cancelling this order will remove its items from running bill and log it into the <strong>Cancelled Orders</strong> directory.
+            </p>
+
+            <form onSubmit={submitCancellation} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Cancellation Reason *</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g. Customer changed mind / Out of stock" 
+                  className="input-control" 
+                  value={cancelReason} 
+                  onChange={(e) => setCancelReason(e.target.value)} 
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setCancellingOrder(null)} className="btn btn-secondary btn-sm">
+                  Close
+                </button>
+                <button type="submit" className="btn btn-danger btn-sm">
+                  Confirm Cancellation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

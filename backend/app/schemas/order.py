@@ -30,6 +30,11 @@ class OrderCreate(BaseModel):
     items: List[OrderItemCreate]
 
 
+class OrderStatusUpdate(BaseModel):
+    status: OrderStatus
+    cancellation_reason: Optional[str] = Field(None, example="Out of stock / Customer requested")
+
+
 class OrderResponse(BaseModel):
     id: int
     table_session_id: int
@@ -38,6 +43,7 @@ class OrderResponse(BaseModel):
     subtotal: float
     tax: float
     total: float
+    cancellation_reason: Optional[str] = None
     items: List[OrderItemResponse] = []
     created_at: datetime
 

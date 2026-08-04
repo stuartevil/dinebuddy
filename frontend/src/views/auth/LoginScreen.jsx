@@ -142,7 +142,7 @@ export const LoginScreen = () => {
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button 
               type="button" 
-              onClick={() => handlePrefill('superadmin@dinebuddy.com', 'admin123')}
+              onClick={() => handlePrefill('admin@dinebuddy.com', 'Admin@123')}
               className="btn btn-secondary btn-sm"
               style={{ fontSize: '0.75rem' }}
             >

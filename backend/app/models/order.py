@@ -32,6 +32,7 @@ class Order(Base, IDMixin, TimestampMixin):
     subtotal = Column(Float, default=0.0, nullable=False)
     tax = Column(Float, default=0.0, nullable=False)
     total = Column(Float, default=0.0, nullable=False)
+    cancellation_reason = Column(String(255), nullable=True)
 
     # Relationships
     session = relationship("TableSession", back_populates="orders")

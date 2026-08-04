@@ -62,9 +62,14 @@ export const KDSView = () => {
                   ))}
                 </div>
 
-                <button onClick={() => moveOrder(order.id, 'in_kitchen')} className="btn btn-primary" style={{ width: '100%', marginTop: '0.75rem', padding: '0.75rem', fontSize: '0.95rem' }}>
-                  <Play size={16} /> START PREPARATION
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                  <button onClick={() => moveOrder(order.id, 'in_kitchen')} className="btn btn-primary" style={{ flex: 1, padding: '0.65rem', fontSize: '0.85rem' }}>
+                    <Play size={16} /> START PREPARING
+                  </button>
+                  <button onClick={() => moveOrder(order.id, 'cancelled')} className="btn btn-danger btn-sm" title="Reject / Out of Stock">
+                    Reject
+                  </button>
+                </div>
               </div>
             ))}
           </div>
