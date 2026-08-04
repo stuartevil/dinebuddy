@@ -329,10 +329,9 @@ export const SuperadminDashboard = ({ activeRoute }) => {
         </div>
       ) : null}
 
-
-
-      {/* Restaurant Overview Table */}
-      <div className="panel-card" style={{ padding: '1.5rem' }}>
+      {/* VIEW 2: RESTAURANTS DIRECTORY TABLE (/admin/dashboard & /admin/restaurants) */}
+      {activeRoute !== '/admin/users' ? (
+        <div className="panel-card" style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
           <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Building2 size={20} color="var(--accent-primary)" /> Platform Restaurant Directory
@@ -448,6 +447,7 @@ export const SuperadminDashboard = ({ activeRoute }) => {
           </table>
         </div>
       </div>
+      ) : null}
 
       {/* Add Restaurant Modal */}
       {showAddModal && (
