@@ -17,8 +17,13 @@ export const AuthProvider = ({ children }) => {
   });
 
   const [savedAccounts, setSavedAccounts] = useState(() => {
-    const saved = localStorage.getItem('dinebuddy_saved_accounts');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('dinebuddy_saved_accounts');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
   });
 
   const [restaurants, setRestaurants] = useState([]);
@@ -107,12 +112,13 @@ export const AuthProvider = ({ children }) => {
       let resolvedRole = (userData.role || 'RESTAURANT_ADMIN').toUpperCase();
       if (resolvedRole === 'ADMIN') resolvedRole = ROLES.SUPERADMIN;
 
+      const fullName = userData.full_name || userData.email || 'User';
       const userObj = {
         id: userData.id,
         email: userData.email,
         role: resolvedRole,
-        name: userData.full_name,
-        avatar: userData.full_name ? userData.full_name[0].toUpperCase() : 'U',
+        name: fullName,
+        avatar: fullName ? fullName.charAt(0).toUpperCase() : 'U',
         token,
       };
 

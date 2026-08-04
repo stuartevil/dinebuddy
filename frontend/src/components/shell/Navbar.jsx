@@ -212,18 +212,18 @@ export const Navbar = () => {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.75rem' }}>
-                    {savedAccounts.length === 0 ? (
+                    {(!savedAccounts || savedAccounts.length === 0) ? (
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>
-                        Active Account: {currentUser.email}
+                        Active Account: {currentUser?.email || 'Logged In'}
                       </div>
                     ) : (
-                      savedAccounts.map((acc) => {
-                        const isCurrent = acc.email === currentUser.email;
+                      (savedAccounts || []).map((acc) => {
+                        const isCurrent = acc?.email === currentUser?.email;
                         return (
                           <div
-                            key={acc.email}
+                            key={acc?.email || Math.random()}
                             onClick={() => {
-                              if (!isCurrent) {
+                              if (!isCurrent && acc?.email) {
                                 switchAccount(acc.email);
                               }
                               setShowAccountsPopover(false);
@@ -253,14 +253,14 @@ export const Navbar = () => {
                                 justifyContent: 'center',
                                 flexShrink: 0,
                               }}>
-                                {acc.avatar || acc.name?.[0]?.toUpperCase() || 'U'}
+                                {acc?.avatar || acc?.name?.[0]?.toUpperCase() || 'U'}
                               </div>
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: '0.8rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {acc.name}
+                                  {acc?.name || 'User'}
                                 </div>
                                 <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {getRoleLabel(acc.role)}
+                                  {getRoleLabel(acc?.role)}
                                 </div>
                               </div>
                             </div>
