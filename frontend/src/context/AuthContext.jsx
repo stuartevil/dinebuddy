@@ -35,12 +35,20 @@ export const AuthProvider = ({ children }) => {
       // Backend returns: { status: bool, message: str, data: [...], meta: {...} }
       const list = res.data?.data || [];
       setRestaurants(list);
-      if (list.length > 0 && !selectedRestaurantId) {
-        setSelectedRestaurantId(list[0].id);
+      if (list.length > 0) {
+        setSelectedRestaurantId(prev => {
+          const exists = list.some(r => r.id === prev);
+          return exists ? prev : list[0].id;
+        });
+      } else {
+        setSelectedRestaurantId(null);
       }
+      return list;
     } catch (err) {
       console.warn('Backend /restaurants/ fetch failed:', err.message);
       setRestaurants([]);
+      setSelectedRestaurantId(null);
+      return [];
     }
   };
 
@@ -94,12 +102,12 @@ export const AuthProvider = ({ children }) => {
         token,
       };
 
+      // Fetch fresh restaurants from DB before updating user state
+      await fetchRestaurants();
+
       setCurrentUser(userObj);
       localStorage.setItem('dinebuddy_user', JSON.stringify(userObj));
       addToast('success', 'Backend Authenticated', `Welcome back ${userData.full_name}!`);
-      
-      // Fetch fresh restaurants from DB
-      fetchRestaurants();
     } catch (err) {
       const detail = err?.response?.data?.detail || err.message || 'Login failed';
       console.error('Login failed:', detail);
@@ -110,6 +118,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     setCurrentUser(null);
+    setRestaurants([]);
+    setSelectedRestaurantId(null);
     localStorage.removeItem('dinebuddy_user');
     localStorage.removeItem('dinebuddy_token');
     addToast('info', 'Logged Out', 'You have been safely signed out.');

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { getMediaUrl } from '../../services/apiClient';
 import { 
   LayoutDashboard, 
   Package, 
@@ -19,7 +20,12 @@ import {
 } from 'lucide-react';
 
 export const Sidebar = ({ activeRoute, setActiveRoute }) => {
-  const { activeRole, ROLES } = useAuth();
+  const { activeRole, selectedRestaurant, ROLES } = useAuth();
+  const [logoError, setLogoError] = useState(false);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [selectedRestaurant?.id, selectedRestaurant?.logo_url]);
 
   const getNavigationSchema = () => {
     switch (activeRole) {
@@ -85,12 +91,62 @@ export const Sidebar = ({ activeRoute, setActiveRoute }) => {
     }
   };
 
+  const logoUrl = selectedRestaurant?.logo_url ? getMediaUrl(selectedRestaurant.logo_url) : null;
+
   return (
     <aside className="panel-card" style={{ width: '260px', borderRadius: 0, borderTop: 0, borderBottom: 0, borderLeft: 0, padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <div style={{ padding: '0 0.5rem 1rem 0.5rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem' }}>
-        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          {getPortalTitle()}
-        </span>
+      
+      {/* Sidebar Header: Full Restaurant Logo Box */}
+      <div style={{ padding: '0.25rem 0.25rem 1rem 0.25rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem' }}>
+        {selectedRestaurant && activeRole !== ROLES.SUPERADMIN ? (
+          logoUrl && !logoError ? (
+            <div style={{
+              width: '100%',
+              height: '56px',
+              borderRadius: '12px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.35rem',
+              overflow: 'hidden',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            }}>
+              <img
+                src={logoUrl}
+                alt={selectedRestaurant.name}
+                onError={() => setLogoError(true)}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  borderRadius: '8px',
+                }}
+              />
+            </div>
+          ) : (
+            <div style={{
+              width: '100%',
+              height: '56px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: '1.1rem',
+              color: '#ffffff',
+              boxShadow: '0 4px 15px rgba(99, 102, 241, 0.35)',
+            }}>
+              {selectedRestaurant.name}
+            </div>
+          )
+        ) : (
+          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            {getPortalTitle()}
+          </span>
+        )}
       </div>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', overflowY: 'auto' }}>

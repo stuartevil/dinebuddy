@@ -11,7 +11,7 @@ import os
 import uuid
 from fastapi import HTTPException, UploadFile, status
 
-UPLOAD_BASE = "/app/uploads"
+UPLOAD_BASE = os.getenv("UPLOAD_BASE", os.path.join(os.getcwd(), "uploads"))
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 MAX_FILE_SIZE_MB = 5
 

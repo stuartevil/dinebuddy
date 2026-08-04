@@ -12,7 +12,7 @@ import {
   X,
   Package
 } from 'lucide-react';
-import { api } from '../../services/apiClient';
+import { api, getMediaUrl } from '../../services/apiClient';
 
 export const Navbar = () => {
   const { 
@@ -30,6 +30,12 @@ export const Navbar = () => {
 
   const [showAlertsPopover, setShowAlertsPopover] = useState(false);
   const [lowStockAlerts, setLowStockAlerts] = useState([]);
+  const [logoError, setLogoError] = useState(false);
+
+  // Reset logo error flag whenever active restaurant changes
+  useEffect(() => {
+    setLogoError(false);
+  }, [selectedRestaurant?.id, selectedRestaurant?.logo_url]);
 
   // Fetch real low-stock alerts from backend whenever restaurant changes
   useEffect(() => {
@@ -64,6 +70,8 @@ export const Navbar = () => {
       default: return 'badge-info';
     }
   };
+
+  const logoUrl = selectedRestaurant?.logo_url ? getMediaUrl(selectedRestaurant.logo_url) : null;
 
   return (
     <header className="panel-card" style={{ borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0, padding: '0.85rem 2rem', position: 'relative', zIndex: 1000 }}>

@@ -23,20 +23,4 @@ class IDMixin:
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
 
 
-# Import all models here so Alembic can detect them
-from app.models.user import User  # noqa
-from app.models.customer import Customer  # noqa
-from app.models.restaurant import Restaurant  # noqa
-from app.models.user_restaurant_map import UserRestaurant  # noqa
-from app.models.menu_category import MenuCategory  # noqa
-from app.models.menu_items import MenuItem  # noqa
-from app.models.menu_item_variant import MenuItemVariant  # noqa
-from app.models.restaurant_settings import RestaurantSettings  # noqa
-from app.models.bulk_import_items import MenuItemImportJob  # noqa
-from app.models.restaurant_table import RestaurantTable  # noqa
-from app.models.table_session import TableSession  # noqa
-from app.models.order import Order  # noqa
-from app.models.order_item import OrderItem  # noqa
-from app.models.ingredient import Ingredient  # noqa
-from app.models.recipe_item import RecipeItem  # noqa
-from app.models.stock_transaction import StockTransaction  # noqa
+# Models are imported in app/models/__init__.py for Alembic autogenerate

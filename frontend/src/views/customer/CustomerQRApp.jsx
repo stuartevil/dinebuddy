@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { api } from '../../services/apiClient';
+import { api, getMediaUrl } from '../../services/apiClient';
 import { Utensils, Search, Plus, Minus, ShoppingCart, CheckCircle2, Clock, UtensilsCrossed } from 'lucide-react';
 
 export const CustomerQRApp = () => {
@@ -9,6 +9,13 @@ export const CustomerQRApp = () => {
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [logoError, setLogoError] = useState(false);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [selectedRestaurant?.id, selectedRestaurant?.logo_url]);
+
+  const logoUrl = selectedRestaurant?.logo_url ? getMediaUrl(selectedRestaurant.logo_url) : null;
 
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [search, setSearch] = useState('');
@@ -99,12 +106,47 @@ export const CustomerQRApp = () => {
       
       {/* Header Banner */}
       <div style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', padding: '1.5rem 1.25rem', color: '#fff', borderRadius: '0 0 24px 24px', boxShadow: '0 10px 30px rgba(99, 102, 241, 0.3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.2)', display: 'flex', alignItems: 'center', justifyCenter: 'center' }}>
-            <Utensils size={22} color="#fff" style={{ margin: 'auto' }} />
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {logoUrl && !logoError ? (
+            <img
+              src={logoUrl}
+              alt={selectedRestaurant?.name || 'Restaurant Logo'}
+              onError={() => setLogoError(true)}
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '14px',
+                objectFit: 'cover',
+                border: '2px solid rgba(255, 255, 255, 0.8)',
+                background: '#ffffff',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              }}
+            />
+          ) : (
+            <div style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '14px',
+              background: 'rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: '1.3rem',
+              color: '#ffffff',
+            }}>
+              {selectedRestaurant?.name ? (
+                selectedRestaurant.name.charAt(0).toUpperCase()
+              ) : (
+                <Utensils size={22} color="#fff" style={{ margin: 'auto' }} />
+              )}
+            </div>
+          )}
+
           <div>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff' }}>{selectedRestaurant?.name || 'DineBuddy Restaurant'}</h2>
+            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', lineHeight: '1.1' }}>
+              {selectedRestaurant?.name || 'DineBuddy Restaurant'}
+            </h2>
             <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Digital Table QR Self-Ordering Menu</span>
           </div>
         </div>

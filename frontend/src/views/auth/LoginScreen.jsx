@@ -150,11 +150,11 @@ export const LoginScreen = () => {
             </button>
             <button 
               type="button" 
-              onClick={() => handlePrefill('owner@gourmetbistro.com', 'password123')}
+              onClick={() => handlePrefill('owner@thelab93.com', 'Password@123')}
               className="btn btn-secondary btn-sm"
               style={{ fontSize: '0.75rem' }}
             >
-              🏪 Owner
+              🏪 Owner (The lab93)
             </button>
             <button 
               type="button" 

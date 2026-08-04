@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Settings, Store, FileText, Percent, CreditCard, Bell, Save, Lock } from 'lucide-react';
+import { Settings, Store, FileText, Percent, CreditCard, Bell, Save, Lock, Upload, ImageIcon, X } from 'lucide-react';
+import { api, getMediaUrl } from '../../services/apiClient';
 
 export const RestaurantSettings = () => {
-  const { selectedRestaurant, isSuperadmin, addToast } = useAuth();
+  const { selectedRestaurant, isSuperadmin, addToast, fetchRestaurants } = useAuth();
 
   const [activeTab, setActiveTab] = useState('profile');
   const [form, setForm] = useState({
@@ -27,6 +28,11 @@ export const RestaurantSettings = () => {
     disable_preset_menu_categories: localStorage.getItem('dinebuddy_disable_default_menu_categories') === 'true',
   });
 
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef(null);
+
   useEffect(() => {
     if (selectedRestaurant) {
       setForm(prev => ({
@@ -37,13 +43,59 @@ export const RestaurantSettings = () => {
         address: selectedRestaurant.address || '',
         city: selectedRestaurant.city || '',
       }));
+
+      if (selectedRestaurant.logo_url) {
+        setLogoPreview(getMediaUrl(selectedRestaurant.logo_url));
+      } else {
+        setLogoPreview(null);
+      }
     }
   }, [selectedRestaurant]);
 
-  const handleSave = (e) => {
+  const handleLogoSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleSave = async (e) => {
     e.preventDefault();
     localStorage.setItem('dinebuddy_disable_default_menu_categories', form.disable_preset_menu_categories ? 'true' : 'false');
-    addToast('success', 'Restaurant Settings Saved', 'Your restaurant profile, menu category preferences, and configurations have been updated!');
+    
+    let updatedLogoUrl = selectedRestaurant?.logo_url || null;
+
+    // Upload logo if new logo file selected
+    if (logoFile) {
+      setLogoUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', logoFile);
+        const uploadRes = await api.post('/upload/logo', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        updatedLogoUrl = uploadRes.data.url;
+      } catch (err) {
+        addToast('error', 'Logo Upload Failed', err?.response?.data?.detail || err.message);
+        setLogoUploading(false);
+        return;
+      }
+      setLogoUploading(false);
+    }
+
+    // Save updated restaurant profile if logo or fields changed
+    if (selectedRestaurant?.id) {
+      try {
+        await api.patch(`/restaurants/${selectedRestaurant.id}`, {
+          logo_url: updatedLogoUrl,
+        });
+        if (fetchRestaurants) fetchRestaurants();
+      } catch (err) {
+        console.warn('Backend patch failed:', err.message);
+      }
+    }
+
+    addToast('success', 'Restaurant Settings Saved', 'Your restaurant profile, logo, and configurations have been updated!');
   };
 
   return (
@@ -176,6 +228,71 @@ export const RestaurantSettings = () => {
                   onChange={(e) => setForm({ ...form, city: e.target.value })} 
                 />
               </div>
+            </div>
+
+            {/* Restaurant Logo Upload */}
+            <div style={{ marginTop: '0.5rem', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.75rem', display: 'block' }}>
+                🖼️ Restaurant Brand Logo (Top-Left Display)
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                <div
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '16px',
+                    border: '2px dashed var(--accent-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    background: 'var(--bg-primary)',
+                    flexShrink: 0,
+                  }}
+                >
+                  {logoPreview ? (
+                    <img
+                      src={logoPreview}
+                      alt="Logo preview"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <ImageIcon size={32} color="var(--text-muted)" />
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={logoUploading}
+                  >
+                    <Upload size={14} /> {logoUploading ? 'Uploading...' : logoPreview ? 'Change Logo Image' : 'Upload Logo Image'}
+                  </button>
+                  {logoPreview && (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ color: 'var(--danger)', borderColor: 'var(--danger)', background: 'transparent', fontSize: '0.75rem' }}
+                      onClick={() => { setLogoFile(null); setLogoPreview(null); }}
+                    >
+                      <X size={13} /> Clear Logo
+                    </button>
+                  )}
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    PNG, JPEG, or WebP (Max 5MB). Logo appears on top-left of header and customer menu.
+                  </span>
+                </div>
+              </div>
+
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                style={{ display: 'none' }}
+                onChange={handleLogoSelect}
+              />
             </div>
           </div>
         )}

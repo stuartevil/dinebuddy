@@ -8,7 +8,7 @@ from app.core.database import engine
 from app.db.base import Base
 from app.api.v1.router import api_router
 
-UPLOAD_BASE = "/app/uploads"
+UPLOAD_BASE = os.getenv("UPLOAD_BASE", os.path.join(os.getcwd(), "uploads"))
 
 
 @asynccontextmanager

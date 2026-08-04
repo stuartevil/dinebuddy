@@ -14,7 +14,7 @@ import {
   ImageIcon,
 } from 'lucide-react';
 
-import { api } from '../../services/apiClient';
+import { api, getMediaUrl } from '../../services/apiClient';
 
 export const SuperadminDashboard = ({ activeRoute }) => {
   const { restaurants, setRestaurants, switchRestaurant, addToast, requestConfirm, fetchRestaurants } = useAuth();
@@ -256,7 +256,41 @@ export const SuperadminDashboard = ({ activeRoute }) => {
                 }).map(r => (
                   <tr key={r.id}>
                     <td>
-                      <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{r.name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        {r.logo_url ? (
+                          <img
+                            src={getMediaUrl(r.logo_url)}
+                            alt={r.name}
+                            style={{
+                              width: '34px',
+                              height: '34px',
+                              borderRadius: '8px',
+                              objectFit: 'cover',
+                              border: '1px solid var(--border-color)',
+                              background: '#fff',
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            width: '34px',
+                            height: '34px',
+                            borderRadius: '8px',
+                            background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                            color: '#fff',
+                            fontWeight: 800,
+                            fontSize: '0.9rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            {r.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{r.name}</div>
+                          {r.cuisine_type && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{r.cuisine_type}</span>}
+                        </div>
+                      </div>
                     </td>
                     <td><span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{r.slug}</span></td>
                     <td>{r.city || r.address || '—'}</td>

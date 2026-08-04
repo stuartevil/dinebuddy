@@ -45,3 +45,17 @@ export const DEMO_DATA = {
 };
 
 export const api = client;
+
+/**
+ * Helper to construct full media URL for logos and uploads.
+ * If url is relative (e.g. /static/logos/abc.jpg), prepends the backend origin.
+ */
+export const getMediaUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  const backendOrigin = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+  return `${backendOrigin}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
