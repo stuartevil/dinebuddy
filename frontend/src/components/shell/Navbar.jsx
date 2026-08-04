@@ -10,7 +10,10 @@ import {
   LogOut, 
   AlertTriangle,
   X,
-  Package
+  Package,
+  ChevronDown,
+  UserPlus,
+  Check
 } from 'lucide-react';
 import { api, getMediaUrl } from '../../services/apiClient';
 
@@ -25,10 +28,13 @@ export const Navbar = () => {
     theme, 
     toggleTheme, 
     isSuperadmin,
+    savedAccounts,
+    switchAccount,
     ROLES 
   } = useAuth();
 
   const [showAlertsPopover, setShowAlertsPopover] = useState(false);
+  const [showAccountsPopover, setShowAccountsPopover] = useState(false);
   const [lowStockAlerts, setLowStockAlerts] = useState([]);
   const [logoError, setLogoError] = useState(false);
 
@@ -142,29 +148,141 @@ export const Navbar = () => {
         {/* Right: Notifications, User Profile & Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           
-          {/* Role Badge & User Name */}
+          {/* Multi-Account Session Switcher & Profile Badge */}
           {currentUser && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', background: 'var(--bg-secondary)', padding: '0.35rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <div style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                background: 'var(--accent-primary)',
-                color: '#fff',
-                fontWeight: 800,
-                fontSize: '0.8rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                {currentUser.avatar}
+            <div style={{ position: 'relative' }}>
+              <div 
+                onClick={() => setShowAccountsPopover(!showAccountsPopover)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  background: 'var(--bg-secondary)',
+                  padding: '0.35rem 0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+                title="Click to Switch Active Account Session"
+              >
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: 'var(--accent-primary)',
+                  color: '#fff',
+                  fontWeight: 800,
+                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  {currentUser.avatar}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, lineHeight: '1.1', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    {currentUser.name}
+                    <ChevronDown size={14} color="var(--text-muted)" />
+                  </div>
+                  <span className={`badge ${getRoleBadgeStyle(currentUser.role)}`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', marginTop: '2px' }}>
+                    {getRoleLabel(currentUser.role)}
+                  </span>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, lineHeight: '1.1' }}>{currentUser.name}</div>
-                <span className={`badge ${getRoleBadgeStyle(currentUser.role)}`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', marginTop: '2px' }}>
-                  {getRoleLabel(currentUser.role)}
-                </span>
-              </div>
+
+              {/* Multi-Account Popover Dropdown */}
+              {showAccountsPopover && (
+                <div className="panel-card" style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '48px',
+                  width: '280px',
+                  padding: '0.85rem',
+                  zIndex: 9999,
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.8)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      🔑 Switch Active Session
+                    </span>
+                    <button onClick={() => setShowAccountsPopover(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.75rem' }}>
+                    {savedAccounts.length === 0 ? (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>
+                        Active Account: {currentUser.email}
+                      </div>
+                    ) : (
+                      savedAccounts.map((acc) => {
+                        const isCurrent = acc.email === currentUser.email;
+                        return (
+                          <div
+                            key={acc.email}
+                            onClick={() => {
+                              if (!isCurrent) {
+                                switchAccount(acc.email);
+                              }
+                              setShowAccountsPopover(false);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.5rem 0.65rem',
+                              borderRadius: 'var(--radius-sm)',
+                              background: isCurrent ? 'var(--accent-glow)' : 'var(--bg-primary)',
+                              border: `1px solid ${isCurrent ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                              cursor: isCurrent ? 'default' : 'pointer',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                              <div style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '50%',
+                                background: isCurrent ? 'var(--accent-primary)' : 'var(--border-color)',
+                                color: '#fff',
+                                fontWeight: 800,
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}>
+                                {acc.avatar || acc.name?.[0]?.toUpperCase() || 'U'}
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {acc.name}
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {getRoleLabel(acc.role)}
+                                </div>
+                              </div>
+                            </div>
+                            {isCurrent && <Check size={16} color="var(--accent-primary)" />}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      setShowAccountsPopover(false);
+                      logout();
+                    }}
+                    className="btn btn-secondary btn-sm"
+                    style={{ width: '100%', fontSize: '0.75rem', justifyContent: 'center' }}
+                  >
+                    <UserPlus size={14} /> + Login as Another Account
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

@@ -27,6 +27,24 @@ export const SuperadminDashboard = ({ activeRoute }) => {
     owner_name: '', owner_email: '', owner_password: 'Password@123',
   });
 
+  // Users Management State
+  const [usersList, setUsersList] = useState([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('All');
+
+  useEffect(() => {
+    fetchUsersList();
+  }, []);
+
+  const fetchUsersList = async () => {
+    try {
+      const res = await api.get('/users/');
+      setUsersList(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.warn('Failed to fetch platform users:', err.message);
+    }
+  };
+
   // Edit Restaurant state
   const [editingRestaurant, setEditingRestaurant] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -166,9 +184,17 @@ export const SuperadminDashboard = ({ activeRoute }) => {
             <span className="badge badge-danger" style={{ marginBottom: '0.5rem' }}>
               🌐 PLATFORM SUPERADMIN CONTROL CENTER
             </span>
-            <h1 style={{ fontSize: '1.8rem' }}>DineBuddy Platform Administration</h1>
+            <h1 style={{ fontSize: '1.8rem' }}>
+              {activeRoute === '/admin/users' 
+                ? 'Platform Users Directory' 
+                : activeRoute === '/admin/restaurants'
+                ? 'Restaurants Management'
+                : 'DineBuddy Platform Administration'}
+            </h1>
             <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-              Manage platform restaurants and staff assignments.
+              {activeRoute === '/admin/users'
+                ? 'View and audit all registered platform users, superadmins, and restaurant owners.'
+                : 'Manage platform restaurants, onboard new venues, and manage store access.'}
             </p>
           </div>
 
@@ -178,7 +204,7 @@ export const SuperadminDashboard = ({ activeRoute }) => {
         </div>
       </div>
 
-      {/* KPI Cards — only real data from /restaurants/ */}
+      {/* KPI Cards — only real data from /restaurants/ & /users/ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
         <div className="panel-card" style={{ padding: '1.25rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
@@ -199,7 +225,109 @@ export const SuperadminDashboard = ({ activeRoute }) => {
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Currently active</div>
         </div>
+
+        <div className="panel-card" style={{ padding: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>PLATFORM USERS</span>
+            <Users size={20} color="var(--warning)" />
+          </div>
+          <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '0.5rem', color: 'var(--warning)' }}>
+            {usersList.length}
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Registered accounts</div>
+        </div>
       </div>
+
+      {/* VIEW 1: PLATFORM USERS VIEW (/admin/users) */}
+      {activeRoute === '/admin/users' ? (
+        <div className="panel-card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Users size={20} color="var(--accent-primary)" /> Platform Registered Users
+            </h3>
+
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ position: 'relative', width: '220px' }}>
+                <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input 
+                  type="text" 
+                  placeholder="Search user name/email..." 
+                  className="input-control" 
+                  style={{ paddingLeft: '2.2rem' }}
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                />
+              </div>
+
+              <select className="select-control" value={userRoleFilter} onChange={(e) => setUserRoleFilter(e.target.value)} style={{ width: '150px' }}>
+                <option value="All">All Roles</option>
+                <option value="ADMIN">Superadmin</option>
+                <option value="RESTAURANT_ADMIN">Restaurant Admin</option>
+                <option value="RESTAURANT_STAFF">Staff</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Full Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Verified</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usersList.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                      Loading platform users from database...
+                    </td>
+                  </tr>
+                ) : (
+                  usersList
+                    .filter(u => {
+                      const matchQuery = (u.full_name || '').toLowerCase().includes(userSearch.toLowerCase()) || 
+                                         (u.email || '').toLowerCase().includes(userSearch.toLowerCase());
+                      const roleUpper = (u.role || '').toUpperCase();
+                      const matchRole = userRoleFilter === 'All' || roleUpper === userRoleFilter || (userRoleFilter === 'ADMIN' && roleUpper === 'ADMIN');
+                      return matchQuery && matchRole;
+                    })
+                    .map(u => (
+                      <tr key={u.id}>
+                        <td>#{u.id}</td>
+                        <td>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{u.full_name || 'N/A'}</div>
+                        </td>
+                        <td style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{u.email}</td>
+                        <td>
+                          <span className={`badge ${
+                            u.role === 'admin' ? 'badge-danger' : u.role === 'restaurant_admin' ? 'badge-role' : 'badge-success'
+                          }`}>
+                            {u.role === 'admin' ? '🌐 SUPERADMIN' : u.role === 'restaurant_admin' ? '🏪 RESTAURANT OWNER' : '👨‍🍳 STAFF'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`badge ${u.is_active ? 'badge-success' : 'badge-danger'}`}>
+                            {u.is_active ? 'ACTIVE' : 'INACTIVE'}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '0.8rem', color: u.is_verified ? 'var(--success)' : 'var(--text-muted)' }}>
+                            {u.is_verified ? '✓ Verified' : 'Unverified'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
 
 

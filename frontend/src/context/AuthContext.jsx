@@ -16,6 +16,11 @@ export const AuthProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const [savedAccounts, setSavedAccounts] = useState(() => {
+    const saved = localStorage.getItem('dinebuddy_saved_accounts');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [restaurants, setRestaurants] = useState([]);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(null);
   const [theme, setTheme] = useState('dark');
@@ -28,6 +33,15 @@ export const AuthProvider = ({ children }) => {
       fetchRestaurants();
     }
   }, [currentUser]);
+
+  const saveAccountToMultiSession = (userObj) => {
+    setSavedAccounts(prev => {
+      const filtered = prev.filter(acc => acc.email !== userObj.email);
+      const updated = [userObj, ...filtered];
+      localStorage.setItem('dinebuddy_saved_accounts', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   const fetchRestaurants = async () => {
     try {
@@ -107,6 +121,8 @@ export const AuthProvider = ({ children }) => {
 
       setCurrentUser(userObj);
       localStorage.setItem('dinebuddy_user', JSON.stringify(userObj));
+      saveAccountToMultiSession(userObj);
+
       addToast('success', 'Backend Authenticated', `Welcome back ${userData.full_name}!`);
     } catch (err) {
       const detail = err?.response?.data?.detail || err.message || 'Login failed';
@@ -116,7 +132,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const switchAccount = async (targetEmail) => {
+    const target = savedAccounts.find(acc => acc.email === targetEmail);
+    if (!target) return;
+
+    localStorage.setItem('dinebuddy_token', target.token);
+    localStorage.setItem('dinebuddy_user', JSON.stringify(target));
+    setCurrentUser(target);
+
+    try {
+      await fetchRestaurants();
+      addToast('info', 'Session Switched', `Active user changed to ${target.name} (${target.email})`);
+    } catch (err) {
+      console.warn('Error switching account session:', err.message);
+    }
+  };
+
+  const removeSavedAccount = (targetEmail) => {
+    setSavedAccounts(prev => {
+      const updated = prev.filter(acc => acc.email !== targetEmail);
+      localStorage.setItem('dinebuddy_saved_accounts', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const logout = () => {
+    if (currentUser) {
+      removeSavedAccount(currentUser.email);
+    }
     setCurrentUser(null);
     setRestaurants([]);
     setSelectedRestaurantId(null);
@@ -149,6 +192,9 @@ export const AuthProvider = ({ children }) => {
     currentUser,
     login,
     logout,
+    savedAccounts,
+    switchAccount,
+    removeSavedAccount,
     activeRole: currentUser ? currentUser.role : null,
     restaurants,
     setRestaurants,

@@ -158,11 +158,11 @@ export const LoginScreen = () => {
             </button>
             <button 
               type="button" 
-              onClick={() => handlePrefill('staff@gourmetbistro.com', 'password123')}
+              onClick={() => handlePrefill('staff@thelab93.com', 'Password@123')}
               className="btn btn-secondary btn-sm"
               style={{ fontSize: '0.75rem' }}
             >
-              👨‍🍳 Staff
+              👨‍🍳 Staff (The lab93)
             </button>
           </div>
         </div>
