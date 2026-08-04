@@ -165,14 +165,16 @@ export const SuperadminDashboard = ({ activeRoute }) => {
     });
   };
 
-  const filtered = restaurants.filter(r => {
-    const matchSearch = r.name.toLowerCase().includes(search.toLowerCase()) || r.owner.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'All' || r.status === statusFilter;
+  const filtered = (restaurants || []).filter(r => {
+    const nameStr = (r?.name || '').toLowerCase();
+    const ownerStr = (r?.owner_name || r?.owner || '').toLowerCase();
+    const searchLower = (search || '').toLowerCase();
+    const matchSearch = nameStr.includes(searchLower) || ownerStr.includes(searchLower);
+
+    const rStatus = r?.is_active ? 'Active' : 'Suspended';
+    const matchStatus = statusFilter === 'All' || rStatus === statusFilter;
     return matchSearch && matchStatus;
   });
-
-  const totalRevenue = restaurants.reduce((sum, r) => sum + r.revenue, 0);
-  const totalOrders = restaurants.reduce((sum, r) => sum + r.orders, 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -371,16 +373,14 @@ export const SuperadminDashboard = ({ activeRoute }) => {
               </tr>
             </thead>
             <tbody>
-              {restaurants.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                    No restaurants in database yet. Click "Add New Restaurant" to onboard the first one.
+                    No matching restaurants found in database.
                   </td>
                 </tr>
               ) : (
-                restaurants.filter(r => {
-                  return r.name.toLowerCase().includes(search.toLowerCase());
-                }).map(r => (
+                filtered.map(r => (
                   <tr key={r.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
