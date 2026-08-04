@@ -5,15 +5,15 @@ import { Utensils, Lock, Mail, Eye, EyeOff, ArrowRight, UserCheck } from 'lucide
 export const LoginScreen = () => {
   const { login } = useAuth();
   
-  const [email, setEmail] = useState('superadmin@dinebuddy.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const targetEmail = email.trim() || 'superadmin@dinebuddy.com';
+    const targetEmail = email.trim();
     setLoading(true);
     try {
       await login(targetEmail, password);
