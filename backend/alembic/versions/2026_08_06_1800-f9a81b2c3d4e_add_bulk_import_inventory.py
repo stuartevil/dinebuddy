@@ -1,7 +1,7 @@
 """add_bulk_import_inventory
 
 Revision ID: f9a81b2c3d4e
-Revises: e8f7a9c31b42
+Revises: d324c7f19e82
 Create Date: 2026-08-06 18:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'f9a81b2c3d4e'
-down_revision: Union[str, None] = 'e8f7a9c31b42'
+down_revision: Union[str, None] = 'd324c7f19e82'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
