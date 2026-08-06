@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.models.user import UserRole
 
@@ -6,8 +7,9 @@ class UserCreate(BaseModel):
     email: EmailStr
     full_name: str
     password: str
-
     role: UserRole
+    phone: Optional[str] = None
+    restaurant_id: Optional[int] = None
 
     @field_validator("password")
     @classmethod
@@ -24,11 +26,16 @@ class UserRead(BaseModel):
     id: int
     email: EmailStr
     full_name: str
+    phone: Optional[str] = None
     role: UserRole
     is_active: bool
 
     class Config:
-        from_attributes = True  # Pydantic v2 (better than orm_mode)
+        from_attributes = True
+
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool  # Pydantic v2 (better than orm_mode)
 
 
 class UserLogin(BaseModel):
