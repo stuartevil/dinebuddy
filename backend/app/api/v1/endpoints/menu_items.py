@@ -218,6 +218,7 @@ def create_menu_item(
 
 
 @router.patch("/{item_id}", response_model=MenuItemRead)
+@router.put("/{item_id}", response_model=MenuItemRead)
 def update_menu_item(
     restaurant_id: int,
     item_id: int,

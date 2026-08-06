@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
-import { Package, Plus, Search, Sliders, Trash2, AlertTriangle, Upload, FileText, Download, CheckCircle, RefreshCw, X } from 'lucide-react';
+import { Package, Plus, Search, Sliders, Trash2, AlertTriangle, Upload, FileText, Download, CheckCircle, RefreshCw, X, Edit3 } from 'lucide-react';
 
 export const InventoryDashboard = () => {
   const { selectedRestaurant, addToast, requestConfirm } = useAuth();
@@ -14,6 +14,20 @@ export const InventoryDashboard = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  
+  // Edit ingredient modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editIngredient, setEditIngredient] = useState(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    category: 'Dairy',
+    unit: 'kg',
+    current_stock_qty: '0',
+    reorder_threshold: '5',
+    reorder_qty: '10',
+    cost_per_unit: '0',
+    supplier_name: '',
+  });
 
   const [selectedIngredient, setSelectedIngredient] = useState(null);
 
@@ -114,6 +128,48 @@ export const InventoryDashboard = () => {
       fetchIngredients();
     } catch (err) {
       addToast('error', 'Threshold Update Failed', err?.response?.data?.detail || err.message);
+    }
+  };
+
+  // Open Edit Modal for Raw Ingredient
+  const handleEditClick = (ing) => {
+    setEditIngredient(ing);
+    setEditForm({
+      name: ing.name || '',
+      category: ing.category || 'General',
+      unit: ing.unit || 'kg',
+      current_stock_qty: ing.current_stock_qty !== undefined ? ing.current_stock_qty.toString() : '0',
+      reorder_threshold: ing.reorder_threshold !== undefined ? ing.reorder_threshold.toString() : '0',
+      reorder_qty: ing.reorder_qty !== undefined ? ing.reorder_qty.toString() : '0',
+      cost_per_unit: ing.cost_per_unit !== undefined ? ing.cost_per_unit.toString() : '0',
+      supplier_name: ing.supplier_name || '',
+    });
+    setShowEditModal(true);
+  };
+
+  // Submit Updated Ingredient Details
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editIngredient || !selectedRestaurant) return;
+
+    try {
+      const payload = {
+        name: editForm.name,
+        category: editForm.category || 'General',
+        unit: editForm.unit || 'kg',
+        current_stock_qty: parseFloat(editForm.current_stock_qty) || 0,
+        reorder_threshold: parseFloat(editForm.reorder_threshold) || 0,
+        reorder_qty: parseFloat(editForm.reorder_qty) || 0,
+        cost_per_unit: parseFloat(editForm.cost_per_unit) || 0,
+        supplier_name: editForm.supplier_name || null,
+      };
+
+      await api.put(`/restaurants/${selectedRestaurant.id}/inventory/ingredients/${editIngredient.id}`, payload);
+      addToast('success', 'Ingredient Updated', `"${editForm.name}" updated successfully!`);
+      setShowEditModal(false);
+      fetchIngredients();
+    } catch (err) {
+      addToast('error', 'Update Failed', err?.response?.data?.detail || err.message);
     }
   };
 
@@ -371,9 +427,14 @@ export const InventoryDashboard = () => {
                       <td>₹{unitCost.toFixed(2)} / {ing.unit}</td>
                       <td style={{ fontWeight: 800 }}>₹{stockValue.toFixed(2)}</td>
                       <td>
-                        <button onClick={() => handleDeleteIngredient(ing.id, ing.name)} className="btn btn-danger btn-sm" title="Delete Ingredient">
-                          <Trash2 size={14} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button onClick={() => handleEditClick(ing)} className="btn btn-secondary btn-sm" title="Edit Ingredient">
+                            <Edit3 size={14} /> Edit
+                          </button>
+                          <button onClick={() => handleDeleteIngredient(ing.id, ing.name)} className="btn btn-danger btn-sm" title="Delete Ingredient">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -514,6 +575,113 @@ export const InventoryDashboard = () => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-secondary">Cancel</button>
                 <button type="submit" className="btn btn-primary">Create Ingredient in DB</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Raw Ingredient Modal */}
+      {showEditModal && editIngredient && (
+        <div className="modal-backdrop">
+          <div className="modal-box" style={{ maxWidth: '520px' }}>
+            <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Edit3 size={18} color="var(--accent-primary)" /> Edit Raw Ingredient: {editIngredient.name}
+            </h3>
+            <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Ingredient Name *</label>
+                <input 
+                  type="text" 
+                  required 
+                  className="input-control" 
+                  value={editForm.name} 
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} 
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Category *</label>
+                  <select className="select-control" value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}>
+                    {categoryOptions.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Unit of Measure *</label>
+                  <select className="select-control" value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}>
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                    <option value="litre">litre</option>
+                    <option value="ml">ml</option>
+                    <option value="piece">piece</option>
+                    <option value="box">box</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Current Stock ({editForm.unit}) *
+                  </label>
+                  <input 
+                    type="number" 
+                    step="0.001" 
+                    required 
+                    className="input-control" 
+                    value={editForm.current_stock_qty} 
+                    onChange={(e) => setEditForm({ ...editForm, current_stock_qty: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Unit Cost (₹ per {editForm.unit}) *
+                  </label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    required 
+                    className="input-control" 
+                    value={editForm.cost_per_unit} 
+                    onChange={(e) => setEditForm({ ...editForm, cost_per_unit: e.target.value })} 
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Min Alert Threshold ({editForm.unit}) *
+                  </label>
+                  <input 
+                    type="number" 
+                    step="0.001" 
+                    required 
+                    className="input-control" 
+                    value={editForm.reorder_threshold} 
+                    onChange={(e) => setEditForm({ ...editForm, reorder_threshold: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Supplier Name (optional)
+                  </label>
+                  <input 
+                    type="text" 
+                    className="input-control" 
+                    value={editForm.supplier_name} 
+                    onChange={(e) => setEditForm({ ...editForm, supplier_name: e.target.value })} 
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setShowEditModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn btn-primary">Save Changes</button>
               </div>
             </form>
           </div>

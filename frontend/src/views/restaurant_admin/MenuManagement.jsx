@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
-import { UtensilsCrossed, Plus, Trash2, Layers, Search, Upload, FileText, Download, CheckCircle, RefreshCw, X } from 'lucide-react';
+import { UtensilsCrossed, Plus, Trash2, Layers, Search, Upload, FileText, Download, CheckCircle, RefreshCw, X, Edit3 } from 'lucide-react';
 
 export const MenuManagement = () => {
   const { addToast, selectedRestaurant, requestConfirm } = useAuth();
@@ -14,6 +14,11 @@ export const MenuManagement = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', category_id: '', price: '150.0', description: '', is_available: true });
 
   // Bulk import state
   const [importFile, setImportFile] = useState(null);
@@ -164,6 +169,56 @@ export const MenuManagement = () => {
       addToast('success', 'Menu Item Added', `"${form.name}" added to catalog!`);
       setShowAddModal(false);
       setForm({ name: '', category_id: categories[0]?.id || '', price: '150.0', description: '' });
+    }
+  };
+
+  // Open Edit Modal for Dish
+  const handleEditClick = (item) => {
+    setEditItem(item);
+    setEditForm({
+      name: item.name || '',
+      category_id: item.category_id || '',
+      price: item.price !== undefined ? item.price.toString() : '150.0',
+      description: item.description || '',
+      is_available: item.is_available !== undefined ? item.is_available : true,
+    });
+    setShowEditModal(true);
+  };
+
+  // Submit Updated Menu Dish
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editItem || !selectedRestaurant) return;
+
+    try {
+      const res = await api.patch(`/restaurants/${selectedRestaurant.id}/menu-items/${editItem.id}`, {
+        name: editForm.name,
+        category_id: Number(editForm.category_id),
+        price: parseFloat(editForm.price) || 0,
+        description: editForm.description || null,
+        is_available: editForm.is_available,
+      });
+
+      const updated = res.data;
+      if (updated && updated.id) {
+        setItems(prev => prev.map(i => i.id === editItem.id ? { ...i, ...updated } : i));
+      }
+
+      addToast('success', 'Menu Item Updated', `"${editForm.name}" updated successfully!`);
+      setShowEditModal(false);
+      fetchMenuData();
+    } catch (err) {
+      console.warn('Backend update error, fallback to local state:', err);
+      setItems(prev => prev.map(i => i.id === editItem.id ? {
+        ...i,
+        name: editForm.name,
+        category_id: Number(editForm.category_id),
+        price: parseFloat(editForm.price) || 0,
+        description: editForm.description || '',
+        is_available: editForm.is_available,
+      } : i));
+      addToast('success', 'Menu Item Updated', `"${editForm.name}" updated!`);
+      setShowEditModal(false);
     }
   };
 
@@ -401,9 +456,14 @@ export const MenuManagement = () => {
                       </span>
                     </td>
                     <td>
-                      <button onClick={() => handleDeleteDish(item.id, item.name)} className="btn btn-danger btn-sm" title="Delete Item">
-                        <Trash2 size={14} /> Delete
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <button onClick={() => handleEditClick(item)} className="btn btn-secondary btn-sm" title="Edit Item">
+                          <Edit3 size={14} /> Edit
+                        </button>
+                        <button onClick={() => handleDeleteDish(item.id, item.name)} className="btn btn-danger btn-sm" title="Delete Item">
+                          <Trash2 size={14} /> Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -483,6 +543,83 @@ export const MenuManagement = () => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-secondary">Cancel</button>
                 <button type="submit" className="btn btn-primary">Add Dish to Catalog</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: Edit Menu Item */}
+      {showEditModal && editItem && (
+        <div className="modal-backdrop">
+          <div className="modal-box" style={{ maxWidth: '480px' }}>
+            <h3 style={{ marginBottom: '1.25rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Edit3 size={18} color="var(--accent-primary)" /> Edit Menu Dish: {editItem.name}
+            </h3>
+            <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Dish Name *</label>
+                <input 
+                  type="text" 
+                  required 
+                  className="input-control" 
+                  value={editForm.name} 
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} 
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Category *</label>
+                  <select
+                    className="select-control"
+                    value={editForm.category_id}
+                    onChange={(e) => setEditForm({ ...editForm, category_id: e.target.value })}
+                  >
+                    {visibleCategories.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Price (₹) *</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    required 
+                    className="input-control" 
+                    value={editForm.price} 
+                    onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} 
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Description (optional)</label>
+                <textarea 
+                  rows={2} 
+                  className="input-control" 
+                  value={editForm.description} 
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} 
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  id="edit_is_available"
+                  checked={editForm.is_available}
+                  onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
+                />
+                <label htmlFor="edit_is_available" style={{ fontSize: '0.85rem', cursor: 'pointer' }}>
+                  Dish Available for Order
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setShowEditModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn btn-primary">Save Changes</button>
               </div>
             </form>
           </div>

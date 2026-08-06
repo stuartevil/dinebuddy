@@ -115,6 +115,11 @@ def get_ingredient(
     response_model=IngredientRead,
     summary="Update ingredient details",
 )
+@router.patch(
+    "/ingredients/{ingredient_id}",
+    response_model=IngredientRead,
+    summary="Patch ingredient details",
+)
 def update_ingredient(
     restaurant_id: int,
     ingredient_id: int,
