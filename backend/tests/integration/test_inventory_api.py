@@ -81,3 +81,38 @@ def test_inventory_api_flow(client: TestClient):
     assert sum_res.status_code == 200
     summary = sum_res.json()
     assert summary["low_stock_count"] >= 1
+
+
+def test_download_sample_templates(client: TestClient):
+    # Test CSV sample template
+    res_csv = client.get("/api/v1/restaurants/1/inventory/import/sample-template?file_format=csv")
+    assert res_csv.status_code == 200
+    assert "name,category,unit" in res_csv.text
+
+    # Test JSON sample template
+    res_json = client.get("/api/v1/restaurants/1/inventory/import/sample-template?file_format=json")
+    assert res_json.status_code == 200
+    assert "Fresh Milk" in res_json.text
+
+
+def test_inventory_bulk_import_flow(client: TestClient):
+    csv_content = (
+        "name,category,unit,current_stock_qty,reorder_threshold,reorder_qty,cost_per_unit,supplier_name\n"
+        "Bulk Tea Leaves,Tea,kg,25.0,5.0,10.0,300.0,Tea Traders\n"
+        "Bulk Sugar,General,kg,50.0,10.0,20.0,40.0,Local Wholesale\n"
+    )
+    files = {"file": ("test_import.csv", csv_content, "text/csv")}
+    
+    # 1. Start bulk import
+    import_res = client.post("/api/v1/restaurants/1/inventory/import", files=files)
+    assert import_res.status_code == 202, import_res.text
+    job_data = import_res.json()
+    assert "job_id" in job_data
+    job_id = job_data["job_id"]
+
+    # 2. Get import status
+    status_res = client.get(f"/api/v1/restaurants/1/inventory/import/{job_id}")
+    assert status_res.status_code == 200
+    status_data = status_res.json()
+    assert status_data["id"] == job_id
+

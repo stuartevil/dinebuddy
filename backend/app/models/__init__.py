@@ -10,6 +10,7 @@ from .menu_items import MenuItem
 from .menu_item_variant import MenuItemVariant
 from .restaurant_settings import RestaurantSettings
 from .bulk_import_items import MenuItemImportJob
+from .bulk_import_inventory import IngredientImportJob
 from .restaurant_table import RestaurantTable, TableStatus
 from .table_session import TableSession, SessionStatus, PaymentMethod
 from .order import Order, OrderStatus
@@ -29,6 +30,7 @@ __all__ = [
     "MenuItemVariant",
     "RestaurantSettings",
     "MenuItemImportJob",
+    "IngredientImportJob",
     "RestaurantTable",
     "TableStatus",
     "TableSession",

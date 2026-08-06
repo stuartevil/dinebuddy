@@ -1,5 +1,8 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import io
+import csv
+import json
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, BackgroundTasks, Response
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, check_restaurant_access
@@ -18,7 +21,7 @@ from app.schemas.inventory_schema import (
     StockTransactionRead,
     InventorySummaryRead,
 )
-from app.services import inventory_service
+from app.services import inventory_service, bulk_import_inventory_service
 
 router = APIRouter(
     prefix="/restaurants/{restaurant_id}/inventory",
@@ -367,3 +370,141 @@ def delete_recipe_item(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Recipe item ID {recipe_item_id} not found for menu item {menu_item_id}",
         )
+
+
+# ------------------------------------------------------------------
+# BULK IMPORT INVENTORY
+# ------------------------------------------------------------------
+
+@router.post(
+    "/import",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Bulk import stock ingredients via CSV or JSON file",
+)
+def import_inventory(
+    restaurant_id: int,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Bulk import ingredients asynchronously using CSV or JSON."""
+    check_restaurant_access(restaurant_id, current_user, db)
+
+    filename = (file.filename or "").lower()
+    job = bulk_import_inventory_service.create_job(db, restaurant_id)
+
+    if filename.endswith(".csv"):
+        content = file.file.read().decode("utf-8")
+        # Validate CSV structure
+        csv.DictReader(io.StringIO(content))
+        background_tasks.add_task(
+            bulk_import_inventory_service._run_import_job,
+            job.id,
+            restaurant_id,
+            "csv",
+            content,
+        )
+
+    elif filename.endswith(".json"):
+        content = file.file.read().decode("utf-8")
+        items = json.loads(content)
+        if not isinstance(items, list):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="JSON must be an array of ingredient objects",
+            )
+        background_tasks.add_task(
+            bulk_import_inventory_service._run_import_job,
+            job.id,
+            restaurant_id,
+            "json",
+            items,
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only .csv and .json files are supported",
+        )
+
+    return {
+        "job_id": job.id,
+        "status": job.status,
+        "message": "Inventory bulk import job started successfully",
+    }
+
+
+@router.get(
+    "/import/sample-template",
+    summary="Download sample CSV or JSON import template",
+)
+def download_sample_inventory_template(
+    file_format: str = Query("csv", pattern="^(csv|json)$"),
+):
+    """Generates a downloadable sample CSV or JSON template file for bulk importing inventory."""
+    if file_format == "csv":
+        sample_csv = (
+            "name,category,unit,current_stock_qty,reorder_threshold,reorder_qty,cost_per_unit,supplier_name,supplier_contact,track_expiry,expiry_date\n"
+            'Fresh Milk,Dairy,litre,50.0,10.0,20.0,45.0,Amul Dairy,9876543210,true,2026-08-15\n'
+            'Espresso Coffee Beans,Coffee,kg,15.5,3.0,10.0,850.0,Bean Crafters,9876543211,false,\n'
+            'Refined Sugar,General,kg,100.0,20.0,50.0,42.0,Local Mart,,false,\n'
+            'Takeaway Cups (350ml),Packaging,piece,500.0,100.0,200.0,3.50,PackPlus,,false,\n'
+        )
+        return Response(
+            content=sample_csv,
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="sample_inventory_import.csv"'},
+        )
+    else:
+        sample_json = [
+            {
+                "name": "Fresh Milk",
+                "category": "Dairy",
+                "unit": "litre",
+                "current_stock_qty": 50.0,
+                "reorder_threshold": 10.0,
+                "reorder_qty": 20.0,
+                "cost_per_unit": 45.0,
+                "supplier_name": "Amul Dairy",
+                "supplier_contact": "9876543210",
+                "track_expiry": True,
+                "expiry_date": "2026-08-15"
+            },
+            {
+                "name": "Espresso Coffee Beans",
+                "category": "Coffee",
+                "unit": "kg",
+                "current_stock_qty": 15.5,
+                "reorder_threshold": 3.0,
+                "reorder_qty": 10.0,
+                "cost_per_unit": 850.0,
+                "supplier_name": "Bean Crafters",
+                "supplier_contact": "9876543211",
+                "track_expiry": False
+            }
+        ]
+        return Response(
+            content=json.dumps(sample_json, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": 'attachment; filename="sample_inventory_import.json"'},
+        )
+
+
+@router.get(
+    "/import/{job_id}",
+    summary="Get status of an inventory bulk import job",
+)
+def get_inventory_import_job_status(
+    restaurant_id: int,
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retrieve import job status, progress counts, and error list."""
+    check_restaurant_access(restaurant_id, current_user, db)
+    return bulk_import_inventory_service.get_import_job(
+        db=db,
+        job_id=job_id,
+        restaurant_id=restaurant_id,
+    )
+

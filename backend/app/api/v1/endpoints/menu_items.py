@@ -6,6 +6,8 @@ from fastapi import (
     HTTPException,
     status,
     BackgroundTasks,
+    Response,
+    Query,
 )
 from sqlalchemy.orm import Session
 from io import StringIO
@@ -87,11 +89,11 @@ def import_menu_items(
         csv.DictReader(StringIO(content))  # validate CSV
 
         background_tasks.add_task(
-            menu_items_service._run_import_job,
+            bulk_import_items_service._run_import_job,
             job.id,
             restaurant_id,
             "csv",
-            content,  # ✅ Pass the CSV content string, not the file
+            content,
         )
 
     # ---------- JSON ----------
@@ -102,13 +104,12 @@ def import_menu_items(
             raise HTTPException(400, "JSON must be an array")
 
         background_tasks.add_task(
-            menu_items_service.run_import_job,
+            bulk_import_items_service._run_import_job,
             job.id,
             restaurant_id,
             "json",
-            items,  # ✅ Already a list of dicts
+            items,
         )
-
 
     else:
         raise HTTPException(400, "Only CSV or JSON supported")
@@ -118,6 +119,51 @@ def import_menu_items(
         "status": job.status,
         "message": "Import started",
     }
+
+
+@router.get("/import/sample-template")
+def download_sample_menu_template(
+    file_format: str = Query("csv", pattern="^(csv|json)$"),
+):
+    """Download sample CSV or JSON template for menu items import."""
+    if file_format == "csv":
+        sample_csv = (
+            "name,category_id,price,description,is_available,is_vegetarian,preparation_time_minutes\n"
+            'Margherita Pizza,1,299.0,Classic cheese and basil pizza,true,true,15\n'
+            'Paneer Butter Masala,2,349.0,Rich cottage cheese curry,true,true,20\n'
+            'Cold Coffee,3,149.0,Chilled espresso with cream,true,true,5\n'
+        )
+        return Response(
+            content=sample_csv,
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="sample_menu_import.csv"'},
+        )
+    else:
+        sample_json = [
+            {
+                "name": "Margherita Pizza",
+                "category_id": 1,
+                "price": 299.0,
+                "description": "Classic cheese and basil pizza",
+                "is_available": True,
+                "is_vegetarian": True,
+                "preparation_time_minutes": 15
+            },
+            {
+                "name": "Paneer Butter Masala",
+                "category_id": 2,
+                "price": 349.0,
+                "description": "Rich cottage cheese curry",
+                "is_available": True,
+                "is_vegetarian": True,
+                "preparation_time_minutes": 20
+            }
+        ]
+        return Response(
+            content=json.dumps(sample_json, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": 'attachment; filename="sample_menu_import.json"'},
+        )
 
 
 @router.get("/import/{job_id}")

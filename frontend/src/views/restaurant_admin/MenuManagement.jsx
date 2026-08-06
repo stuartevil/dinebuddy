@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
-import { UtensilsCrossed, Plus, Trash2, Layers, Search } from 'lucide-react';
+import { UtensilsCrossed, Plus, Trash2, Layers, Search, Upload, FileText, Download, CheckCircle, RefreshCw, X } from 'lucide-react';
 
 export const MenuManagement = () => {
   const { addToast, selectedRestaurant, requestConfirm } = useAuth();
@@ -13,6 +13,12 @@ export const MenuManagement = () => {
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  // Bulk import state
+  const [importFile, setImportFile] = useState(null);
+  const [importUploading, setImportUploading] = useState(false);
+  const [importJob, setImportJob] = useState(null);
 
   const [form, setForm] = useState({ name: '', category_id: '', price: '150.0', description: '' });
   const [newCatName, setNewCatName] = useState('');
@@ -181,6 +187,84 @@ export const MenuManagement = () => {
     });
   };
 
+  // Download Sample Import Template for Menu Items (CSV or JSON)
+  const handleDownloadSample = async (format) => {
+    if (!selectedRestaurant) return;
+    try {
+      const restId = selectedRestaurant.id;
+      const res = await api.get(`/restaurants/${restId}/menu-items/import/sample-template?file_format=${format}`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([res.data], { type: format === 'csv' ? 'text/csv' : 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sample_menu_import.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      addToast('success', 'Sample Downloaded', `Sample ${format.toUpperCase()} template downloaded successfully.`);
+    } catch (err) {
+      addToast('error', 'Download Failed', 'Could not download sample template file.');
+    }
+  };
+
+  // Submit Bulk Import File for Menu Items
+  const handleImportSubmit = async (e) => {
+    e.preventDefault();
+    if (!importFile || !selectedRestaurant) {
+      addToast('warning', 'File Required', 'Please select a CSV or JSON file to import.');
+      return;
+    }
+
+    setImportUploading(true);
+    setImportJob(null);
+
+    const formData = new FormData();
+    formData.append('file', importFile);
+
+    try {
+      const restId = selectedRestaurant.id;
+      const res = await api.post(`/restaurants/${restId}/menu-items/import`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const jobId = res.data.job_id;
+      addToast('info', 'Import Started', 'Processing your bulk menu items file...');
+      pollImportStatus(jobId);
+    } catch (err) {
+      setImportUploading(false);
+      addToast('error', 'Upload Failed', err?.response?.data?.detail || err.message);
+    }
+  };
+
+  // Poll Import Job Status
+  const pollImportStatus = (jobId) => {
+    if (!selectedRestaurant) return;
+    const interval = setInterval(async () => {
+      try {
+        const restId = selectedRestaurant.id;
+        const res = await api.get(`/restaurants/${restId}/menu-items/import/${jobId}`);
+        const job = res.data;
+        setImportJob(job);
+
+        if (job.status === 'COMPLETED' || job.status === 'FAILED') {
+          clearInterval(interval);
+          setImportUploading(false);
+          fetchMenuData();
+          if (job.status === 'COMPLETED' && job.failed_count === 0) {
+            addToast('success', 'Import Completed', `Successfully imported ${job.success_count} menu item(s)!`);
+          } else {
+            addToast('warning', 'Import Finished with Errors', `Import processed: ${job.success_count} succeeded, ${job.failed_count} failed.`);
+          }
+        }
+      } catch (err) {
+        clearInterval(interval);
+        setImportUploading(false);
+      }
+    }, 1500);
+  };
+
   const getCategoryName = (catId) => {
     const found = categories.find(c => c.id === catId);
     return found ? found.name : `Category #${catId}`;
@@ -208,7 +292,10 @@ export const MenuManagement = () => {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button onClick={() => { setShowImportModal(true); setImportJob(null); setImportFile(null); }} className="btn btn-secondary">
+              <Upload size={16} /> Bulk Import Menu
+            </button>
             <button onClick={() => setShowCategoryModal(true)} className="btn btn-secondary">
               <Layers size={16} /> + Add Category
             </button>
@@ -399,9 +486,150 @@ export const MenuManagement = () => {
               </div>
             </form>
           </div>
+      )}
+
+      {/* Bulk Import Menu Items Modal */}
+      {showImportModal && (
+        <div className="modal-backdrop">
+          <div className="modal-box" style={{ maxWidth: '580px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Upload size={20} color="var(--accent-primary)" /> Bulk Import Restaurant Menu Dishes
+              </h3>
+              <button 
+                onClick={() => setShowImportModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Template Download Section */}
+            <div style={{ 
+              background: 'var(--bg-secondary, rgba(255, 255, 255, 0.05))', 
+              borderRadius: '8px', 
+              padding: '1rem', 
+              marginBottom: '1.25rem',
+              border: '1px border-dashed var(--border-color, rgba(255, 255, 255, 0.1))'
+            }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                📄 Step 1: Download Sample Template File
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                Use our sample template to format dish names, category IDs, prices, and descriptions correctly before uploading.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button 
+                  type="button" 
+                  onClick={() => handleDownloadSample('csv')}
+                  className="btn btn-secondary btn-sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
+                >
+                  <Download size={14} /> Download Sample CSV (.csv)
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => handleDownloadSample('json')}
+                  className="btn btn-secondary btn-sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
+                >
+                  <Download size={14} /> Download Sample JSON (.json)
+                </button>
+              </div>
+            </div>
+
+            {/* Upload Form */}
+            <form onSubmit={handleImportSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem', display: 'block' }}>
+                  📁 Step 2: Upload CSV or JSON File *
+                </label>
+                <input 
+                  type="file" 
+                  accept=".csv,.json"
+                  required
+                  className="input-control"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setImportFile(e.target.files[0]);
+                    }
+                  }}
+                  style={{ padding: '0.5rem' }}
+                />
+                {importFile && (
+                  <div style={{ fontSize: '0.78rem', color: 'var(--success)', marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <CheckCircle size={14} /> Selected: {importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)
+                  </div>
+                )}
+              </div>
+
+              {/* Progress & Status Card */}
+              {importJob && (
+                <div style={{ padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>
+                      Status: <span className={`badge ${importJob.status === 'COMPLETED' ? 'badge-success' : importJob.status === 'FAILED' ? 'badge-danger' : 'badge-warning'}`}>
+                        {importJob.status}
+                      </span>
+                    </span>
+                    {importUploading && (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <RefreshCw size={14} className="spin" /> Processing...
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', textAlign: 'center', marginTop: '0.5rem' }}>
+                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '0.5rem', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>TOTAL</div>
+                      <div style={{ fontWeight: 800 }}>{importJob.total_records}</div>
+                    </div>
+                    <div style={{ background: 'rgba(34, 197, 94, 0.1)', padding: '0.5rem', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--success)' }}>SUCCESS</div>
+                      <div style={{ fontWeight: 800, color: 'var(--success)' }}>{importJob.success_count}</div>
+                    </div>
+                    <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '0.5rem', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>FAILED</div>
+                      <div style={{ fontWeight: 800, color: 'var(--danger)' }}>{importJob.failed_count}</div>
+                    </div>
+                  </div>
+
+                  {/* Errors List */}
+                  {importJob.errors && importJob.errors.length > 0 && (
+                    <div style={{ marginTop: '0.75rem', maxHeight: '140px', overflowY: 'auto' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--danger)', marginBottom: '0.25rem' }}>
+                        Failed Rows Details:
+                      </div>
+                      {importJob.errors.map((errItem, idx) => (
+                        <div key={idx} style={{ fontSize: '0.75rem', color: 'var(--danger)', background: 'rgba(239, 68, 68, 0.05)', padding: '0.35rem 0.5rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                          <strong>Row #{errItem.row}:</strong> {errItem.error}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setShowImportModal(false)} className="btn btn-secondary">
+                  Close
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={importUploading || !importFile} 
+                  className="btn btn-primary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  {importUploading ? <RefreshCw size={14} className="spin" /> : <Upload size={14} />}
+                  {importUploading ? 'Processing Import...' : 'Start Bulk Import'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
     </div>
   );
 };
+
