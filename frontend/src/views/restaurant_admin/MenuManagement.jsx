@@ -300,7 +300,7 @@ export const MenuManagement = () => {
               <Layers size={16} /> + Add Category
             </button>
             <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
-              <Plus size={16} /> + Add Menu Item
+              <Plus size={16} /> Add Menu Item
             </button>
           </div>
         </div>
@@ -497,7 +497,7 @@ export const MenuManagement = () => {
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Upload size={20} color="var(--accent-primary)" /> Bulk Import Restaurant Menu Dishes
               </h3>
-              <button 
+              <button
                 onClick={() => setShowImportModal(false)}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               >
@@ -506,10 +506,10 @@ export const MenuManagement = () => {
             </div>
 
             {/* Template Download Section */}
-            <div style={{ 
-              background: 'var(--bg-secondary, rgba(255, 255, 255, 0.05))', 
-              borderRadius: '8px', 
-              padding: '1rem', 
+            <div style={{
+              background: 'var(--bg-secondary, rgba(255, 255, 255, 0.05))',
+              borderRadius: '8px',
+              padding: '1rem',
               marginBottom: '1.25rem',
               border: '1px border-dashed var(--border-color, rgba(255, 255, 255, 0.1))'
             }}>
@@ -520,16 +520,16 @@ export const MenuManagement = () => {
                 Use our sample template to format dish names, category IDs, prices, and descriptions correctly before uploading.
               </p>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => handleDownloadSample('csv')}
                   className="btn btn-secondary btn-sm"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
                 >
                   <Download size={14} /> Download Sample CSV (.csv)
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => handleDownloadSample('json')}
                   className="btn btn-secondary btn-sm"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
@@ -545,8 +545,8 @@ export const MenuManagement = () => {
                 <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem', display: 'block' }}>
                   📁 Step 2: Upload CSV or JSON File *
                 </label>
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   accept=".csv,.json"
                   required
                   className="input-control"
@@ -615,9 +615,9 @@ export const MenuManagement = () => {
                 <button type="button" onClick={() => setShowImportModal(false)} className="btn btn-secondary">
                   Close
                 </button>
-                <button 
-                  type="submit" 
-                  disabled={importUploading || !importFile} 
+                <button
+                  type="submit"
+                  disabled={importUploading || !importFile}
                   className="btn btn-primary"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
                 >
