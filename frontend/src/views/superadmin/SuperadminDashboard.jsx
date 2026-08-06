@@ -12,6 +12,7 @@ import {
   Upload,
   X,
   ImageIcon,
+  UserCheck,
 } from 'lucide-react';
 
 import { api, getMediaUrl } from '../../services/apiClient';
@@ -25,6 +26,13 @@ export const SuperadminDashboard = ({ activeRoute }) => {
   const [form, setForm] = useState({
     name: '', email: '', phone: '', address: '', city: '', description: '', cuisine_type: '',
     owner_name: '', owner_email: '', owner_password: 'Password@123',
+  });
+
+  // Re-assign Owner State
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [reassignRestaurant, setReassignRestaurant] = useState(null);
+  const [reassignForm, setReassignForm] = useState({
+    full_name: '', email: '', phone: '', password: 'Password@123',
   });
 
   // Users Management State
@@ -163,6 +171,41 @@ export const SuperadminDashboard = ({ activeRoute }) => {
         }
       }
     });
+  };
+
+  const handleOpenReassign = (r) => {
+    setReassignRestaurant(r);
+    setReassignForm({
+      full_name: '',
+      email: '',
+      phone: '',
+      password: 'Password@123',
+    });
+    setShowReassignModal(true);
+  };
+
+  const handleReassignSubmit = async (e) => {
+    e.preventDefault();
+    if (!reassignRestaurant || !reassignForm.email || !reassignForm.full_name) return;
+
+    try {
+      const payload = {
+        full_name: reassignForm.full_name,
+        email: reassignForm.email,
+        phone: reassignForm.phone || null,
+        password: reassignForm.password || 'Password@123',
+        role: 'restaurant_admin',
+        restaurant_id: reassignRestaurant.id,
+      };
+
+      await api.post('/users/', payload);
+      addToast('success', 'Admin Re-assigned', `New owner account created & assigned to "${reassignRestaurant.name}"!`);
+      setShowReassignModal(false);
+      fetchUsersList();
+      fetchRestaurants();
+    } catch (err) {
+      addToast('error', 'Re-assign Failed', err?.response?.data?.detail || err.message);
+    }
   };
 
   const filtered = (restaurants || []).filter(r => {
@@ -428,9 +471,12 @@ export const SuperadminDashboard = ({ activeRoute }) => {
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                         <button onClick={() => switchRestaurant(r.id)} className="btn btn-secondary btn-sm" title="Inspect Restaurant">
                           <Eye size={14} /> Inspect
+                        </button>
+                        <button onClick={() => handleOpenReassign(r)} className="btn btn-secondary btn-sm" title="Re-assign Owner Admin Credentials">
+                          <UserCheck size={14} /> Re-assign Owner
                         </button>
                         <button onClick={() => handleOpenEdit(r)} className="btn btn-secondary btn-sm" title="Edit Restaurant">
                           <Edit size={14} /> Edit
@@ -676,6 +722,97 @@ export const SuperadminDashboard = ({ activeRoute }) => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setEditingRestaurant(null)} className="btn btn-secondary">Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Re-assign Owner Modal */}
+      {showReassignModal && reassignRestaurant && (
+        <div className="modal-backdrop">
+          <div className="modal-box" style={{ maxWidth: '520px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                  <UserCheck size={20} color="var(--accent-primary)" />
+                  <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Re-assign Restaurant Owner</h3>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                  Creating new admin credentials for: <strong style={{ color: 'var(--accent-primary)' }}>"{reassignRestaurant.name}"</strong>
+                </p>
+              </div>
+              <button onClick={() => setShowReassignModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{
+              background: 'rgba(239,68,68,0.08)',
+              border: '1px solid rgba(239,68,68,0.3)',
+              borderRadius: '8px',
+              padding: '0.75rem 1rem',
+              marginBottom: '1.25rem',
+              fontSize: '0.8rem',
+              color: '#f87171',
+            }}>
+              ⚠️ A <strong>new Restaurant Admin account</strong> will be created and linked to this restaurant. The old (deleted) admin's credentials will no longer work.
+            </div>
+
+            <form onSubmit={handleReassignSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  className="input-control"
+                  placeholder="e.g. Atharva Mishra"
+                  value={reassignForm.full_name}
+                  onChange={(e) => setReassignForm({ ...reassignForm, full_name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Email Address *</label>
+                <input
+                  type="email"
+                  required
+                  className="input-control"
+                  placeholder="e.g. newowner@thelab93.com"
+                  value={reassignForm.email}
+                  onChange={(e) => setReassignForm({ ...reassignForm, email: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Phone (Optional)</label>
+                  <input
+                    type="text"
+                    className="input-control"
+                    placeholder="+91 98765 43210"
+                    value={reassignForm.phone}
+                    onChange={(e) => setReassignForm({ ...reassignForm, phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>New Password *</label>
+                  <input
+                    type="text"
+                    required
+                    className="input-control"
+                    placeholder="Password@123"
+                    value={reassignForm.password}
+                    onChange={(e) => setReassignForm({ ...reassignForm, password: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setShowReassignModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn btn-primary">
+                  <UserCheck size={15} /> Create & Assign Owner
+                </button>
               </div>
             </form>
           </div>
