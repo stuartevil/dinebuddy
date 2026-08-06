@@ -486,6 +486,7 @@ export const MenuManagement = () => {
               </div>
             </form>
           </div>
+        </div>
       )}
 
       {/* Bulk Import Menu Items Modal */}
