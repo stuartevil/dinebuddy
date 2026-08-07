@@ -72,7 +72,7 @@ export const KDSView = () => {
             {newOrders.map(order => (
               <div key={order.id} className="panel-card" style={{ padding: '1rem', borderLeft: '4px solid var(--warning)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.1rem' }}>
-                  <span>Table {order.table_number || 'Takeaway'}</span>
+                  <span>{order.table_number && !order.table_number.toLowerCase().includes('takeaway') ? `Table ${order.table_number}` : '🥡 TAKEAWAY'}</span>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</span>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Ticket {order.order_number || `ORD-${order.id}`}</div>
@@ -109,7 +109,7 @@ export const KDSView = () => {
             {kitchenOrders.map(order => (
               <div key={order.id} className="panel-card" style={{ padding: '1rem', borderLeft: '4px solid var(--accent-primary)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.1rem' }}>
-                  <span>Table {order.table_number || 'Takeaway'}</span>
+                  <span>{order.table_number && !order.table_number.toLowerCase().includes('takeaway') ? `Table ${order.table_number}` : '🥡 TAKEAWAY'}</span>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</span>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Ticket {order.order_number || `ORD-${order.id}`}</div>
@@ -141,7 +141,7 @@ export const KDSView = () => {
             {readyOrders.map(order => (
               <div key={order.id} className="panel-card" style={{ padding: '1rem', borderLeft: '4px solid var(--success)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.1rem' }}>
-                  <span>Table {order.table_number || 'Takeaway'}</span>
+                  <span>{order.table_number && !order.table_number.toLowerCase().includes('takeaway') ? `Table ${order.table_number}` : '🥡 TAKEAWAY'}</span>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Ready</span>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Ticket {order.order_number || `ORD-${order.id}`}</div>

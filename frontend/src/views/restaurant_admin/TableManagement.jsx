@@ -186,9 +186,11 @@ export const TableManagement = () => {
     return subtotal * 1.05; // including 5% GST
   };
 
-  const availableCount = tables.filter(t => t.status === 'available').length;
-  const occupiedCount = tables.filter(t => t.status === 'occupied').length;
-  const reservedCount = tables.filter(t => t.status === 'reserved').length;
+  const floorTables = tables.filter(t => !(t.table_number || '').toLowerCase().includes('takeaway'));
+
+  const availableCount = floorTables.filter(t => t.status === 'available').length;
+  const occupiedCount = floorTables.filter(t => t.status === 'occupied').length;
+  const reservedCount = floorTables.filter(t => t.status === 'reserved').length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -229,7 +231,7 @@ export const TableManagement = () => {
         <div className="panel-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
           Loading floor plan tables from database...
         </div>
-      ) : tables.length === 0 ? (
+      ) : floorTables.length === 0 ? (
         /* Empty State */
         <div className="panel-card" style={{ padding: '3rem 2rem', textAlign: 'center' }}>
           <QrCode size={48} color="var(--text-muted)" style={{ margin: '0 auto 1rem auto', opacity: 0.5 }} />
@@ -244,7 +246,7 @@ export const TableManagement = () => {
       ) : (
         /* Floor Plan Table Cards Grid */
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.25rem' }}>
-          {tables.map(tbl => {
+          {floorTables.map(tbl => {
             let statusBadge = 'badge-success';
             let border = 'var(--success-border)';
             if (tbl.status === 'occupied') { statusBadge = 'badge-danger'; border = 'var(--danger-border)'; }

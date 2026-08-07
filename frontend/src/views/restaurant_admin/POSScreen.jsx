@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
-import { 
-  Search, 
-  Plus, 
-  Minus, 
-  Trash2, 
-  CheckCircle, 
+import {
+  Search,
+  Plus,
+  Minus,
+  Trash2,
+  CheckCircle,
   UtensilsCrossed,
   Receipt,
   ImageIcon
@@ -14,7 +14,7 @@ import {
 
 export const POSScreen = () => {
   const { selectedRestaurant, addToast } = useAuth();
-  
+
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [tables, setTables] = useState([]);
@@ -93,25 +93,8 @@ export const POSScreen = () => {
     try {
       let targetTableId = null;
 
-      if (selectedTable === 'Takeaway') {
-        // Find existing dedicated Takeaway table or auto-create one
-        let takeawayTable = tables.find(t => (t.table_number || '').toLowerCase().includes('takeaway'));
-        if (takeawayTable) {
-          targetTableId = takeawayTable.id;
-        } else {
-          try {
-            const newTableRes = await api.post('/tables/', {
-              restaurant_id: selectedRestaurant.id,
-              table_number: 'Takeaway',
-              capacity: 100
-            });
-            targetTableId = newTableRes.data.id;
-            setTables(prev => [...prev, newTableRes.data]);
-          } catch {
-            if (tables.length > 0) targetTableId = tables[0].id;
-          }
-        }
-      } else {
+      // Find selected table or fallback to existing table
+      if (selectedTable !== 'Takeaway') {
         const matched = tables.find(t => String(t.id) === String(selectedTable) || t.table_number === selectedTable);
         if (matched) targetTableId = matched.id;
       }
@@ -120,11 +103,12 @@ export const POSScreen = () => {
         targetTableId = tables[0].id;
       }
 
+      // If no table exists at all for restaurant, auto-create a Takeaway / POS table
       if (!targetTableId) {
         const newTableRes = await api.post('/tables/', {
           restaurant_id: selectedRestaurant.id,
-          table_number: 'Takeaway',
-          capacity: 100
+          table_number: 'Takeaway Counter',
+          capacity: 10
         });
         targetTableId = newTableRes.data.id;
         setTables([newTableRes.data]);
@@ -175,19 +159,19 @@ export const POSScreen = () => {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '1.5rem', minHeight: 'calc(100vh - 140px)' }}>
-      
+
       {/* Left Column: Menu Item Browser */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        
+
         {/* Search & Category Header */}
         <div className="panel-card" style={{ padding: '1rem' }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: 1 }}>
               <Search size={18} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input 
-                type="text" 
-                placeholder="Search menu items for quick POS ordering..." 
-                className="input-control" 
+              <input
+                type="text"
+                placeholder="Search menu items for quick POS ordering..."
+                className="input-control"
                 style={{ paddingLeft: '2.5rem' }}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -196,7 +180,7 @@ export const POSScreen = () => {
 
             {/* Category Pills */}
             <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
-              <button 
+              <button
                 onClick={() => setSelectedCategory('All')}
                 className={`btn btn-sm ${selectedCategory === 'All' ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ borderRadius: '9999px' }}
@@ -204,8 +188,8 @@ export const POSScreen = () => {
                 All
               </button>
               {visibleCategories.map(cat => (
-                <button 
-                  key={cat.id} 
+                <button
+                  key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`btn btn-sm ${selectedCategory === cat.id ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ borderRadius: '9999px' }}
@@ -241,10 +225,10 @@ export const POSScreen = () => {
             {filteredDishes.map(dish => {
               const itemPrice = parseFloat(dish.price) || 0;
               return (
-                <div 
-                  key={dish.id} 
+                <div
+                  key={dish.id}
                   onClick={() => addToCart(dish)}
-                  className="panel-card" 
+                  className="panel-card"
                   style={{ padding: '1rem', cursor: 'pointer', borderLeft: dish.is_available ? '3px solid var(--success)' : '3px solid var(--danger)' }}
                 >
                   <div style={{
@@ -281,7 +265,7 @@ export const POSScreen = () => {
 
       {/* Right Column: Current Order & Checkout Desk */}
       <div className="panel-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', height: '100%' }}>
-        
+
         {/* Order Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1rem' }}>
           <div>
@@ -359,8 +343,8 @@ export const POSScreen = () => {
           {/* Payment Mode Selector */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.35rem', margin: '0.75rem 0' }}>
             {['UPI', 'CARD', 'CASH', 'ONLINE'].map(method => (
-              <button 
-                key={method} 
+              <button
+                key={method}
                 onClick={() => setPaymentMethod(method)}
                 className={`btn btn-sm ${paymentMethod === method ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ fontSize: '0.75rem', padding: '0.4rem 0.2rem' }}

@@ -109,7 +109,9 @@ export const OrdersModule = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <div>
                   <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>{order.order_number || `ORD-${order.id}`}</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Table: {order.table_number || 'Takeaway'} • {order.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>
+                    {order.table_number && !order.table_number.toLowerCase().includes('takeaway') ? `Table: ${order.table_number}` : '🥡 Takeaway Order'} • {order.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+                  </span>
                 </div>
                 <span className={`badge ${
                   (order.status || '').toLowerCase() === 'cancelled' ? 'badge-danger' :
