@@ -93,8 +93,25 @@ export const POSScreen = () => {
     try {
       let targetTableId = null;
 
-      // Find selected table or fallback to existing table
-      if (selectedTable !== 'Takeaway') {
+      if (selectedTable === 'Takeaway') {
+        // Find existing dedicated Takeaway table or auto-create one
+        let takeawayTable = tables.find(t => (t.table_number || '').toLowerCase().includes('takeaway'));
+        if (takeawayTable) {
+          targetTableId = takeawayTable.id;
+        } else {
+          try {
+            const newTableRes = await api.post('/tables/', {
+              restaurant_id: selectedRestaurant.id,
+              table_number: 'Takeaway',
+              capacity: 100
+            });
+            targetTableId = newTableRes.data.id;
+            setTables(prev => [...prev, newTableRes.data]);
+          } catch {
+            if (tables.length > 0) targetTableId = tables[0].id;
+          }
+        }
+      } else {
         const matched = tables.find(t => String(t.id) === String(selectedTable) || t.table_number === selectedTable);
         if (matched) targetTableId = matched.id;
       }
@@ -103,12 +120,11 @@ export const POSScreen = () => {
         targetTableId = tables[0].id;
       }
 
-      // If no table exists at all for restaurant, auto-create a Takeaway / POS table
       if (!targetTableId) {
         const newTableRes = await api.post('/tables/', {
           restaurant_id: selectedRestaurant.id,
-          table_number: 'Takeaway Counter',
-          capacity: 10
+          table_number: 'Takeaway',
+          capacity: 100
         });
         targetTableId = newTableRes.data.id;
         setTables([newTableRes.data]);
