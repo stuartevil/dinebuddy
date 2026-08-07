@@ -35,8 +35,10 @@ class SalesReportSummary(BaseModel):
 class ItemSalesPerformance(BaseModel):
     menu_item_id: int
     menu_item_name: str
+    item_name: Optional[str] = None
     category_name: Optional[str] = None
     total_quantity_sold: int
+    quantity_sold: Optional[int] = None
     total_revenue: Decimal
     average_price: Decimal
 

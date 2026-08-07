@@ -158,12 +158,15 @@ def get_top_selling_items(
     results = query.all()
     output = []
     for row in results:
+        qty = int(row.total_qty or 0)
         output.append(
             ItemSalesPerformance(
                 menu_item_id=row.menu_item_id,
-                menu_item_name=row.menu_item_name,
+                menu_item_name=row.menu_item_name or f"Item #{row.menu_item_id}",
+                item_name=row.menu_item_name or f"Item #{row.menu_item_id}",
                 category_name=row.category_name,
-                total_quantity_sold=int(row.total_qty or 0),
+                total_quantity_sold=qty,
+                quantity_sold=qty,
                 total_revenue=Decimal(str(round(row.total_rev or 0.0, 2))),
                 average_price=Decimal(str(round(row.avg_price or 0.0, 2))),
             )

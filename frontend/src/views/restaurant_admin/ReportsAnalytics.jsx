@@ -224,9 +224,9 @@ export const ReportsAnalytics = () => {
                       topItems.map((item, idx) => (
                         <tr key={idx}>
                           <td style={{ fontWeight: 800 }}>#{item.rank || idx + 1}</td>
-                          <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{item.item_name}</td>
-                          <td>{item.quantity_sold} sold</td>
-                          <td style={{ fontWeight: 700, color: 'var(--success)' }}>₹{(item.total_revenue || 0).toLocaleString('en-IN')}</td>
+                          <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{item.item_name || item.menu_item_name || 'Dish Item'}</td>
+                          <td>{item.quantity_sold ?? item.total_quantity_sold ?? 0} sold</td>
+                          <td style={{ fontWeight: 700, color: 'var(--success)' }}>₹{parseFloat(item.total_revenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         </tr>
                       ))
                     )}
