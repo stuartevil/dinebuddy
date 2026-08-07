@@ -37,7 +37,7 @@ export const KDSView = () => {
 
   const newOrders = orders.filter(o => o.status === 'pending');
   const kitchenOrders = orders.filter(o => o.status === 'in_kitchen');
-  const readyOrders = orders.filter(o => o.status === 'ready' || o.status === 'served');
+  const readyOrders = orders.filter(o => o.status === 'ready');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minHeight: 'calc(100vh - 140px)' }}>
