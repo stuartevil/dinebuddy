@@ -1,16 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { api, DEMO_DATA } from '../../services/apiClient';
+import { api } from '../../services/apiClient';
 import { Layers, Clock, CheckCircle2, Eye, CreditCard, XCircle, AlertTriangle, X } from 'lucide-react';
 
 export const OrdersModule = () => {
-  const { addToast } = useAuth();
+  const { selectedRestaurant, addToast } = useAuth();
   const [activeTab, setActiveTab] = useState('All');
-  const [orders, setOrders] = useState(DEMO_DATA.orders);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   // Cancel Order Modal State
   const [cancellingOrder, setCancellingOrder] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
+
+  const fetchOrders = () => {
+    if (!selectedRestaurant) {
+      setLoading(false);
+      return;
+    }
+    api.get(`/restaurants/${selectedRestaurant.id}/orders`)
+      .then(res => {
+        setOrders(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(err => {
+        console.error("Fetch orders error:", err);
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 8000); // auto refresh every 8 seconds for live POS orders
+    return () => clearInterval(interval);
+  }, [selectedRestaurant]);
 
   const handleUpdateStatus = async (id, newStatus, reason = '') => {
     try {
@@ -18,20 +40,16 @@ export const OrdersModule = () => {
         status: newStatus,
         cancellation_reason: reason || undefined,
       });
-    } catch {
-      // Fallback locally for demo mode
+
+      addToast(newStatus === 'cancelled' ? 'error' : 'info', 
+        newStatus === 'cancelled' ? 'Order Cancelled' : 'Order Status Updated', 
+        `Order #${id} ${newStatus === 'cancelled' ? `cancelled (${reason || 'No reason specified'})` : `marked as ${newStatus}`}`
+      );
+      fetchOrders();
+    } catch (err) {
+      console.error("Update order status error:", err);
+      addToast('error', 'Status Update Failed', err.response?.data?.detail || 'Could not update status');
     }
-
-    setOrders(prev => prev.map(o => o.id === id ? { 
-      ...o, 
-      status: newStatus,
-      cancellation_reason: reason || o.cancellation_reason,
-    } : o));
-
-    addToast(newStatus === 'cancelled' ? 'error' : 'info', 
-      newStatus === 'cancelled' ? 'Order Cancelled' : 'Order Status Updated', 
-      `Order ${id} ${newStatus === 'cancelled' ? `cancelled (${reason || 'No reason specified'})` : `marked as ${newStatus}`}`
-    );
   };
 
   const submitCancellation = (e) => {
@@ -74,7 +92,11 @@ export const OrdersModule = () => {
 
       {/* Orders Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
-        {filteredOrders.length === 0 ? (
+        {loading && orders.length === 0 ? (
+          <div className="panel-card" style={{ gridColumn: '1 / -1', padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            Loading live orders from restaurant backend...
+          </div>
+        ) : filteredOrders.length === 0 ? (
           <div className="panel-card" style={{ gridColumn: '1 / -1', padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
             No orders found matching status filter "{activeTab}".
           </div>
@@ -86,8 +108,8 @@ export const OrdersModule = () => {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <div>
-                  <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>{order.id}</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Table: {order.table_number} • {order.time}</span>
+                  <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>{order.order_number || `ORD-${order.id}`}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Table: {order.table_number || 'Takeaway'} • {order.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</span>
                 </div>
                 <span className={`badge ${
                   order.status === 'cancelled' ? 'badge-danger' :
@@ -102,8 +124,8 @@ export const OrdersModule = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0.85rem 0', background: 'var(--bg-secondary)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
                 {order.items.map((item, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>{item.qty}x {item.name}</span>
-                    <span style={{ fontWeight: 700 }}>₹{(item.qty * item.price).toFixed(2)}</span>
+                    <span>{item.quantity || item.qty}x {item.name} {item.special_instructions ? `(${item.special_instructions})` : ''}</span>
+                    <span style={{ fontWeight: 700 }}>₹{parseFloat(item.total_price || (item.unit_price * item.quantity) || 0).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -115,9 +137,9 @@ export const OrdersModule = () => {
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 800, fontSize: '1rem', marginBottom: '1rem' }}>
-                <span>Total ({order.payment})</span>
+                <span>Total Amount</span>
                 <span style={{ color: order.status === 'cancelled' ? 'var(--text-muted)' : 'var(--success)', textDecoration: order.status === 'cancelled' ? 'line-through' : 'none' }}>
-                  ₹{order.total.toFixed(2)}
+                  ₹{parseFloat(order.total || 0).toFixed(2)}
                 </span>
               </div>
 

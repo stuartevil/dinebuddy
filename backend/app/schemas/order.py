@@ -49,3 +49,30 @@ class OrderResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class RestaurantOrderItemDetail(BaseModel):
+    id: int
+    menu_item_id: int
+    name: str
+    quantity: int
+    unit_price: float
+    total_price: float
+    special_instructions: Optional[str] = None
+
+
+class RestaurantOrderResponse(BaseModel):
+    id: int
+    order_number: str
+    table_number: str
+    status: OrderStatus
+    subtotal: float
+    tax: float
+    total: float
+    cancellation_reason: Optional[str] = None
+    items: List[RestaurantOrderItemDetail] = []
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+

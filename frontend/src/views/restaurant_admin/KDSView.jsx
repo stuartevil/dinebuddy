@@ -1,20 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { DEMO_DATA } from '../../services/apiClient';
+import { api } from '../../services/apiClient';
 import { MonitorPlay, Clock, CheckCircle2, Play } from 'lucide-react';
 
 export const KDSView = () => {
-  const { addToast } = useAuth();
-  const [orders, setOrders] = useState(DEMO_DATA.orders);
+  const { selectedRestaurant, addToast } = useAuth();
+  const [orders, setOrders] = useState([]);
 
-  const moveOrder = (id, nextStatus) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: nextStatus } : o));
-    addToast('info', 'KDS Ticket Updated', `Order ${id} moved to ${nextStatus.toUpperCase()}`);
+  const fetchOrders = () => {
+    if (!selectedRestaurant) return;
+    api.get(`/restaurants/${selectedRestaurant.id}/orders`)
+      .then(res => {
+        setOrders(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(err => {
+        console.error("KDS fetch orders error:", err);
+      });
+  };
+
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 5000); // 5 sec live poll for Kitchen Display
+    return () => clearInterval(interval);
+  }, [selectedRestaurant]);
+
+  const moveOrder = async (id, nextStatus) => {
+    try {
+      await api.patch(`/orders/${id}/status`, { status: nextStatus });
+      addToast('info', 'KDS Ticket Updated', `Order #${id} moved to ${nextStatus.toUpperCase()}`);
+      fetchOrders();
+    } catch (err) {
+      console.error("KDS move order error:", err);
+      addToast('error', 'Status Update Failed', err.response?.data?.detail || 'Could not update status');
+    }
   };
 
   const newOrders = orders.filter(o => o.status === 'pending');
   const kitchenOrders = orders.filter(o => o.status === 'in_kitchen');
-  const readyOrders = orders.filter(o => o.status === 'ready');
+  const readyOrders = orders.filter(o => o.status === 'ready' || o.status === 'served');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minHeight: 'calc(100vh - 140px)' }}>

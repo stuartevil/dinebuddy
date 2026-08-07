@@ -1,10 +1,11 @@
+from typing import List
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate
+from app.schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate, RestaurantOrderResponse
 from app.schemas.table_session import (
     SessionCreate,
     TableSessionResponse,
@@ -14,6 +15,16 @@ from app.schemas.table_session import (
 from app.services.billing_service import BillingService
 
 router = APIRouter()
+
+
+@router.get("/restaurants/{restaurant_id}/orders", response_model=List[RestaurantOrderResponse])
+def get_restaurant_orders(
+    restaurant_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """List all orders for a specific restaurant across sessions"""
+    return BillingService.get_orders_for_restaurant(db, restaurant_id)
 
 
 @router.post("/tables/{table_id}/open-session", response_model=TableSessionResponse, status_code=status.HTTP_201_CREATED)
@@ -70,3 +81,4 @@ def update_order_status_endpoint(
     return BillingService.update_order_status(
         db, order_id, payload.status, payload.cancellation_reason
     )
+

@@ -291,3 +291,45 @@ class BillingService:
         db.commit()
         db.refresh(session)
         return session
+
+    @staticmethod
+    def get_orders_for_restaurant(db: Session, restaurant_id: int) -> List[dict]:
+        orders = (
+            db.query(Order)
+            .join(TableSession, Order.table_session_id == TableSession.id)
+            .filter(TableSession.restaurant_id == restaurant_id)
+            .order_by(Order.created_at.desc())
+            .all()
+        )
+
+        result = []
+        for order in orders:
+            table_num = order.session.table.table_number if (order.session and order.session.table) else "Takeaway"
+            items_list = []
+            for item in order.items:
+                menu_item = db.query(MenuItem).filter(MenuItem.id == item.menu_item_id).first()
+                item_name = menu_item.name if menu_item else f"Item #{item.menu_item_id}"
+                items_list.append({
+                    "id": item.id,
+                    "menu_item_id": item.menu_item_id,
+                    "name": item_name,
+                    "quantity": item.quantity,
+                    "unit_price": item.unit_price,
+                    "total_price": item.total_price,
+                    "special_instructions": item.special_instructions
+                })
+
+            result.append({
+                "id": order.id,
+                "order_number": order.order_number,
+                "table_number": table_num,
+                "status": order.status,
+                "subtotal": order.subtotal,
+                "tax": order.tax,
+                "total": order.total,
+                "cancellation_reason": order.cancellation_reason,
+                "items": items_list,
+                "created_at": order.created_at
+            })
+        return result
+
