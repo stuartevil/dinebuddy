@@ -112,20 +112,20 @@ export const OrdersModule = () => {
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Table: {order.table_number || 'Takeaway'} • {order.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</span>
                 </div>
                 <span className={`badge ${
-                  order.status === 'cancelled' ? 'badge-danger' :
-                  order.status === 'pending' ? 'badge-warning' : 
-                  order.status === 'in_kitchen' ? 'badge-info' : 'badge-success'
+                  (order.status || '').toLowerCase() === 'cancelled' ? 'badge-danger' :
+                  (order.status || '').toLowerCase() === 'pending' ? 'badge-warning' : 
+                  (order.status || '').toLowerCase() === 'in_kitchen' ? 'badge-info' : 'badge-success'
                 }`}>
-                  {order.status.toUpperCase()}
+                  {(order.status || 'PENDING').toUpperCase()}
                 </span>
               </div>
 
               {/* Items Breakdown */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0.85rem 0', background: 'var(--bg-secondary)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
-                {order.items.map((item, idx) => (
+                {(order.items || []).map((item, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>{item.quantity || item.qty}x {item.name} {item.special_instructions ? `(${item.special_instructions})` : ''}</span>
-                    <span style={{ fontWeight: 700 }}>₹{parseFloat(item.total_price || (item.unit_price * item.quantity) || 0).toFixed(2)}</span>
+                    <span>{item.quantity || item.qty || 1}x {item.name || 'Item'} {item.special_instructions ? `(${item.special_instructions})` : ''}</span>
+                    <span style={{ fontWeight: 700 }}>₹{parseFloat(item.total_price || (item.unit_price * (item.quantity || 1)) || 0).toFixed(2)}</span>
                   </div>
                 ))}
               </div>

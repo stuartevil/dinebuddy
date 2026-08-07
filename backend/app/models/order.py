@@ -7,6 +7,7 @@ from app.db.base import Base, IDMixin, TimestampMixin
 class OrderStatus(str, enum.Enum):
     PENDING = "pending"
     IN_KITCHEN = "in_kitchen"
+    READY = "ready"
     SERVED = "served"
     CANCELLED = "cancelled"
 
