@@ -162,7 +162,29 @@ class BillingService:
         if new_status == OrderStatus.CANCELLED:
             order.cancellation_reason = cancellation_reason or "Cancelled by user"
 
-        db.commit()
+        try:
+            db.commit()
+        except Exception as err:
+            db.rollback()
+            # Handle production Postgres enum missing 'ready' status
+            conn_engine = db.get_bind().name
+            if conn_engine == 'postgresql':
+                try:
+                    raw_conn = db.get_bind().raw_connection()
+                    raw_conn.set_isolation_level(0)  # autocommit mode
+                    cur = raw_conn.cursor()
+                    cur.execute("ALTER TYPE orderstatus ADD VALUE IF NOT EXISTS 'ready';")
+                    cur.close()
+                except Exception:
+                    pass
+                # Retry status update
+                db.query(Order).filter(Order.id == order_id).update({
+                    "status": new_status.value if hasattr(new_status, 'value') else str(new_status)
+                })
+                db.commit()
+            else:
+                raise err
+
         db.refresh(order)
 
         # Recalculate session running bill if session exists

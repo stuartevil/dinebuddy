@@ -19,10 +19,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # For Postgres, add 'ready' value to enum type if exists
+    # For Postgres, add 'ready' value to enum type outside transaction block
     bind = op.get_bind()
     if bind.engine.name == 'postgresql':
-        op.execute("ALTER TYPE orderstatus ADD VALUE IF NOT EXISTS 'ready';")
+        with op.get_context().autocommit_block():
+            op.execute("ALTER TYPE orderstatus ADD VALUE IF NOT EXISTS 'ready';")
 
 
 def downgrade() -> None:
