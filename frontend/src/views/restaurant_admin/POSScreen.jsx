@@ -40,7 +40,7 @@ export const POSScreen = () => {
     Promise.all([
       api.get(`/restaurants/${restId}/menu-categories/`).catch(() => ({ data: [] })),
       api.get(`/restaurants/${restId}/menu-items/`).catch(() => ({ data: [] })),
-      api.get(`/tables/`, { params: { restaurant_id: restId } }).catch(() => ({ data: [] })),
+      api.get(`/tables/restaurant/${restId}`).catch(() => ({ data: [] })),
     ]).then(([catRes, itemsRes, tablesRes]) => {
       const catList = Array.isArray(catRes.data) ? catRes.data : catRes.data?.data || [];
       const itemList = Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data?.data || [];
@@ -51,7 +51,7 @@ export const POSScreen = () => {
       setTables(tableList);
 
       if (tableList.length > 0) {
-        setSelectedTable(tableList[0].table_number || `T-${tableList[0].id}`);
+        setSelectedTable(String(tableList[0].id));
       }
     }).finally(() => {
       setLoading(false);
@@ -87,11 +87,60 @@ export const POSScreen = () => {
   const gst = subtotal * 0.05;
   const total = Math.max(0, subtotal + gst - discount);
 
-  const handleCheckout = () => {
-    if (cart.length === 0) return;
-    addToast('success', 'Order Placed & Paid!', `₹${total.toFixed(2)} collected via ${paymentMethod} (${selectedTable})`);
-    setCart([]);
-    setDiscount(0);
+  const handleCheckout = async () => {
+    if (cart.length === 0 || !selectedRestaurant) return;
+
+    try {
+      let targetTableId = null;
+
+      // Find selected table or fallback to existing table
+      if (selectedTable !== 'Takeaway') {
+        const matched = tables.find(t => String(t.id) === String(selectedTable) || t.table_number === selectedTable);
+        if (matched) targetTableId = matched.id;
+      }
+
+      if (!targetTableId && tables.length > 0) {
+        targetTableId = tables[0].id;
+      }
+
+      // If no table exists at all for restaurant, auto-create a Takeaway / POS table
+      if (!targetTableId) {
+        const newTableRes = await api.post('/tables/', {
+          restaurant_id: selectedRestaurant.id,
+          table_number: 'Takeaway Counter',
+          capacity: 10
+        });
+        targetTableId = newTableRes.data.id;
+        setTables([newTableRes.data]);
+      }
+
+      // 1. Post order items to table session
+      const orderPayload = {
+        items: cart.map(item => ({
+          menu_item_id: item.id,
+          quantity: item.qty,
+          special_instructions: item.note || null
+        }))
+      };
+
+      await api.post(`/tables/${targetTableId}/orders`, orderPayload);
+
+      // 2. Complete checkout & mark session as PAID
+      const checkoutPayload = {
+        payment_method: (paymentMethod || 'cash').toLowerCase(),
+        discount: parseFloat(discount) || 0.0
+      };
+
+      await api.post(`/tables/${targetTableId}/checkout`, checkoutPayload);
+
+      addToast('success', 'Order Placed & Paid!', `₹${total.toFixed(2)} collected via ${paymentMethod}. Saved to Database & Sales Reports updated!`);
+      setCart([]);
+      setDiscount(0);
+    } catch (err) {
+      console.error("POS Checkout error:", err);
+      const errMsg = err.response?.data?.detail || 'Failed to persist order to database.';
+      addToast('error', 'Checkout Failed', errMsg);
+    }
   };
 
   const isDisableDefault = localStorage.getItem('dinebuddy_disable_default_menu_categories') === 'true';
