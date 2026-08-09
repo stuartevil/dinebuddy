@@ -35,6 +35,7 @@ export const RestaurantSettings = () => {
 
   useEffect(() => {
     if (selectedRestaurant) {
+      const savedLocalTax = localStorage.getItem(`dinebuddy_tax_rate_${selectedRestaurant.id}`);
       setForm(prev => ({
         ...prev,
         name: selectedRestaurant.name || '',
@@ -42,6 +43,7 @@ export const RestaurantSettings = () => {
         email: selectedRestaurant.email || '',
         address: selectedRestaurant.address || '',
         city: selectedRestaurant.city || '',
+        tax_rate: savedLocalTax !== null ? savedLocalTax : (prev.tax_rate || '5')
       }));
 
       if (selectedRestaurant.logo_url) {
@@ -49,6 +51,19 @@ export const RestaurantSettings = () => {
       } else {
         setLogoPreview(null);
       }
+
+      // Fetch settings from backend database
+      api.get(`/restaurants/${selectedRestaurant.id}/settings`)
+        .then(res => {
+          if (res.data && res.data.tax_percentage !== undefined && res.data.tax_percentage !== null) {
+            const fetchedTax = String(res.data.tax_percentage);
+            setForm(prev => ({ ...prev, tax_rate: fetchedTax }));
+            localStorage.setItem(`dinebuddy_tax_rate_${selectedRestaurant.id}`, fetchedTax);
+          }
+        })
+        .catch(err => {
+          console.warn("Fetch settings warning:", err.message);
+        });
     }
   }, [selectedRestaurant]);
 
@@ -83,19 +98,28 @@ export const RestaurantSettings = () => {
       setLogoUploading(false);
     }
 
-    // Save updated restaurant profile if logo or fields changed
+    // Save updated restaurant profile & backend settings
     if (selectedRestaurant?.id) {
       try {
         await api.patch(`/restaurants/${selectedRestaurant.id}`, {
           logo_url: updatedLogoUrl,
         });
+
+        // Save GST Tax Percentage to backend database settings
+        const parsedTax = parseFloat(form.tax_rate) || 0.0;
+        await api.patch(`/restaurants/${selectedRestaurant.id}/settings`, {
+          tax_percentage: parsedTax
+        });
+
+        localStorage.setItem(`dinebuddy_tax_rate_${selectedRestaurant.id}`, form.tax_rate);
+
         if (fetchRestaurants) fetchRestaurants();
       } catch (err) {
         console.warn('Backend patch failed:', err.message);
       }
     }
 
-    addToast('success', 'Restaurant Settings Saved', 'Your restaurant profile, logo, and configurations have been updated!');
+    addToast('success', 'GST Tax & Restaurant Settings Saved', `Default GST rate updated to ${form.tax_rate}%! Billing and POS calculations updated.`);
   };
 
   return (

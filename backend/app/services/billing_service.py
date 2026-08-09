@@ -20,6 +20,17 @@ class BillingService:
     """Service to handle Table Session Billing and Order Appending"""
 
     @staticmethod
+    def _get_restaurant_tax_percentage(db: Session, restaurant_id: int) -> float:
+        try:
+            from app.models.restaurant_settings import RestaurantSettings
+            settings = db.query(RestaurantSettings).filter(RestaurantSettings.restaurant_id == restaurant_id).first()
+            if settings and settings.tax_percentage is not None:
+                return float(settings.tax_percentage)
+        except Exception:
+            pass
+        return DEFAULT_TAX_PERCENTAGE
+
+    @staticmethod
     def get_active_session_for_table(db: Session, table_id: int) -> Optional[TableSession]:
         return (
             db.query(TableSession)
@@ -119,7 +130,8 @@ class BillingService:
             )
             db.add(order_item)
 
-        order_tax = round(order_subtotal * (DEFAULT_TAX_PERCENTAGE / 100.0), 2)
+        tax_pct = BillingService._get_restaurant_tax_percentage(db, session.restaurant_id)
+        order_tax = round(order_subtotal * (tax_pct / 100.0), 2)
         order.subtotal = round(order_subtotal, 2)
         order.tax = order_tax
         order.total = round(order_subtotal + order_tax, 2)
@@ -211,7 +223,8 @@ class BillingService:
         subtotal = sum(order.subtotal for order in active_orders)
         tax = sum(order.tax for order in active_orders)
         subtotal_after_discount = max(0.0, subtotal - session.discount)
-        tax_calculated = round(subtotal_after_discount * (DEFAULT_TAX_PERCENTAGE / 100.0), 2)
+        tax_pct = BillingService._get_restaurant_tax_percentage(db, session.restaurant_id)
+        tax_calculated = round(subtotal_after_discount * (tax_pct / 100.0), 2)
         
         session.subtotal = round(subtotal, 2)
         session.tax = tax_calculated
