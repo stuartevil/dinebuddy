@@ -320,6 +320,7 @@ export const RestaurantSettings = () => {
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>Default GST Tax Rate (%)</label>
                 <select className="select-control" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })}>
+                  <option value="0">0% (Zero Tax / Exempted)</option>
                   <option value="5">5% (Standard Restaurant Rate)</option>
                   <option value="12">12%</option>
                   <option value="18">18%</option>

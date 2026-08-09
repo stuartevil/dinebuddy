@@ -223,7 +223,8 @@ export const printBill = (bill, restaurant = {}) => {
   const items = bill.items || [];
 
   const subtotal = parseFloat(bill.subtotal || items.reduce((s, i) => s + (parseFloat(i.price || i.unit_price || 0) * (i.quantity || i.qty || 1)), 0) || 0);
-  const gst = parseFloat(bill.gst || bill.tax || (subtotal * 0.05) || 0);
+  const gstRate = restaurant.tax_rate !== undefined && restaurant.tax_rate !== null ? parseFloat(restaurant.tax_rate) : (bill.tax_rate !== undefined ? parseFloat(bill.tax_rate) : 5);
+  const gst = bill.gst !== undefined ? parseFloat(bill.gst) : (bill.tax !== undefined ? parseFloat(bill.tax) : (subtotal * (gstRate / 100)));
   const discount = parseFloat(bill.discount || 0);
   const total = parseFloat(bill.total || (subtotal + gst - discount) || 0);
   const paymentMethod = (bill.payment_method || 'CASH').toUpperCase();
@@ -379,7 +380,7 @@ export const printBill = (bill, restaurant = {}) => {
           <td style="text-align: right;">₹${subtotal.toFixed(2)}</td>
         </tr>
         <tr>
-          <td>GST (5%):</td>
+          <td>GST (${gstRate}%):</td>
           <td style="text-align: right;">₹${gst.toFixed(2)}</td>
         </tr>
         ${discount > 0 ? `

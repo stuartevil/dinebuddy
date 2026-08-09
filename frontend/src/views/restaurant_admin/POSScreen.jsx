@@ -90,7 +90,8 @@ export const POSScreen = () => {
   };
 
   const subtotal = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
-  const gst = subtotal * 0.05;
+  const taxRate = selectedRestaurant?.tax_rate !== undefined ? parseFloat(selectedRestaurant.tax_rate) : 5;
+  const gst = subtotal * (taxRate / 100);
   const total = Math.max(0, subtotal + gst - discount);
 
   const handlePrintCartKOT = () => {
@@ -432,7 +433,7 @@ export const POSScreen = () => {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            <span>GST (5%)</span>
+            <span>GST ({taxRate}%)</span>
             <span>₹{gst.toFixed(2)}</span>
           </div>
 
