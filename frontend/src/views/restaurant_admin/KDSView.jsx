@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
-import { MonitorPlay, Clock, CheckCircle2, Play } from 'lucide-react';
+import { printKOT } from '../../services/printService';
+import { MonitorPlay, Clock, CheckCircle2, Play, Printer } from 'lucide-react';
 
 export const KDSView = () => {
   const { selectedRestaurant, addToast } = useAuth();
@@ -86,6 +87,9 @@ export const KDSView = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                  <button onClick={() => printKOT(order, selectedRestaurant)} className="btn btn-secondary btn-sm" title="Print KOT Slip to HP Thermal Printer" style={{ padding: '0.65rem 0.75rem' }}>
+                    <Printer size={16} />
+                  </button>
                   <button onClick={() => moveOrder(order.id, 'in_kitchen')} className="btn btn-primary" style={{ flex: 1, padding: '0.65rem', fontSize: '0.85rem' }}>
                     <Play size={16} /> START PREPARING
                   </button>
@@ -122,9 +126,14 @@ export const KDSView = () => {
                   ))}
                 </div>
 
-                <button onClick={() => moveOrder(order.id, 'ready')} className="btn btn-success" style={{ width: '100%', marginTop: '0.75rem', padding: '0.75rem', fontSize: '0.95rem' }}>
-                  <CheckCircle2 size={16} /> MARK READY
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                  <button onClick={() => printKOT(order, selectedRestaurant)} className="btn btn-secondary btn-sm" title="Print KOT Slip to HP Thermal Printer" style={{ padding: '0.65rem 0.75rem' }}>
+                    <Printer size={16} />
+                  </button>
+                  <button onClick={() => moveOrder(order.id, 'ready')} className="btn btn-success" style={{ flex: 1, padding: '0.75rem', fontSize: '0.95rem' }}>
+                    <CheckCircle2 size={16} /> MARK READY
+                  </button>
+                </div>
               </div>
             ))}
           </div>

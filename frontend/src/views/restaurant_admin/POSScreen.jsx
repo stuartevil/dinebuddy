@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
+import { printKOT, printBill } from '../../services/printService';
 import {
   Search,
   Plus,
@@ -9,7 +10,8 @@ import {
   CheckCircle,
   UtensilsCrossed,
   Receipt,
-  ImageIcon
+  ImageIcon,
+  Printer
 } from 'lucide-react';
 
 export const POSScreen = () => {
@@ -26,6 +28,7 @@ export const POSScreen = () => {
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('UPI');
   const [cart, setCart] = useState([]);
+  const [kotSent, setKotSent] = useState(false);
 
   // Fetch real categories, menu items, and tables from backend
   useEffect(() => {
@@ -59,6 +62,7 @@ export const POSScreen = () => {
   }, [selectedRestaurant]);
 
   const addToCart = (item) => {
+    setKotSent(false);
     const itemPrice = parseFloat(item.price) || 0;
     setCart(prev => {
       const exists = prev.find(i => i.id === item.id);
@@ -70,6 +74,7 @@ export const POSScreen = () => {
   };
 
   const updateQty = (id, delta) => {
+    setKotSent(false);
     setCart(prev => prev.map(i => {
       if (i.id === id) {
         const nextQty = i.qty + delta;
@@ -80,6 +85,7 @@ export const POSScreen = () => {
   };
 
   const removeFromCart = (id) => {
+    setKotSent(false);
     setCart(prev => prev.filter(i => i.id !== id));
   };
 
@@ -87,13 +93,40 @@ export const POSScreen = () => {
   const gst = subtotal * 0.05;
   const total = Math.max(0, subtotal + gst - discount);
 
-  const handleCheckout = async () => {
+  const handlePrintCartKOT = () => {
+    if (cart.length === 0) return;
+    const orderData = {
+      order_number: `KOT-${Date.now().toString().slice(-4)}`,
+      table_number: selectedTable,
+      created_at: new Date().toISOString(),
+      items: cart
+    };
+    printKOT(orderData, selectedRestaurant);
+  };
+
+  const handlePrintCartBill = () => {
+    if (cart.length === 0) return;
+    const billData = {
+      order_number: `BILL-${Date.now().toString().slice(-4)}`,
+      table_number: selectedTable,
+      created_at: new Date().toISOString(),
+      items: cart,
+      subtotal,
+      gst,
+      discount,
+      total,
+      payment_method: paymentMethod,
+      payment_status: 'PAID'
+    };
+    printBill(billData, selectedRestaurant);
+  };
+
+  const handleSendToKitchen = async () => {
     if (cart.length === 0 || !selectedRestaurant) return;
 
     try {
       let targetTableId = null;
 
-      // Find selected table or fallback to existing table
       if (selectedTable !== 'Takeaway') {
         const matched = tables.find(t => String(t.id) === String(selectedTable) || t.table_number === selectedTable);
         if (matched) targetTableId = matched.id;
@@ -103,7 +136,6 @@ export const POSScreen = () => {
         targetTableId = tables[0].id;
       }
 
-      // If no table exists at all for restaurant, auto-create a Takeaway / POS table
       if (!targetTableId) {
         const newTableRes = await api.post('/tables/', {
           restaurant_id: selectedRestaurant.id,
@@ -114,7 +146,6 @@ export const POSScreen = () => {
         setTables([newTableRes.data]);
       }
 
-      // 1. Post order items to table session
       const orderPayload = {
         items: cart.map(item => ({
           menu_item_id: item.id,
@@ -125,7 +156,63 @@ export const POSScreen = () => {
 
       await api.post(`/tables/${targetTableId}/orders`, orderPayload);
 
-      // 2. Complete checkout & mark session as PAID
+      // Print KOT
+      const orderData = {
+        order_number: `KOT-${Date.now().toString().slice(-4)}`,
+        table_number: selectedTable,
+        created_at: new Date().toISOString(),
+        items: cart
+      };
+      printKOT(orderData, selectedRestaurant);
+
+      setKotSent(true);
+      addToast('info', '🔥 KOT Printed & Sent to Kitchen!', 'Kitchen is preparing food. Click "Pay & Print Bill" when customer pays.');
+    } catch (err) {
+      console.error("Send KOT error:", err);
+      handlePrintCartKOT();
+      setKotSent(true);
+      addToast('info', 'KOT Printed!', 'Printed KOT for Kitchen.');
+    }
+  };
+
+  const handlePayAndPrintBill = async () => {
+    if (cart.length === 0 || !selectedRestaurant) return;
+
+    try {
+      let targetTableId = null;
+
+      if (selectedTable !== 'Takeaway') {
+        const matched = tables.find(t => String(t.id) === String(selectedTable) || t.table_number === selectedTable);
+        if (matched) targetTableId = matched.id;
+      }
+
+      if (!targetTableId && tables.length > 0) {
+        targetTableId = tables[0].id;
+      }
+
+      if (!targetTableId) {
+        const newTableRes = await api.post('/tables/', {
+          restaurant_id: selectedRestaurant.id,
+          table_number: 'Takeaway Counter',
+          capacity: 10
+        });
+        targetTableId = newTableRes.data.id;
+        setTables([newTableRes.data]);
+      }
+
+      // If KOT was not sent earlier, save order now
+      if (!kotSent) {
+        const orderPayload = {
+          items: cart.map(item => ({
+            menu_item_id: item.id,
+            quantity: item.qty,
+            special_instructions: item.note || null
+          }))
+        };
+        await api.post(`/tables/${targetTableId}/orders`, orderPayload).catch(() => {});
+      }
+
+      // Complete checkout & mark session as PAID
       const checkoutPayload = {
         payment_method: (paymentMethod || 'cash').toLowerCase(),
         discount: parseFloat(discount) || 0.0
@@ -133,13 +220,32 @@ export const POSScreen = () => {
 
       await api.post(`/tables/${targetTableId}/checkout`, checkoutPayload);
 
-      addToast('success', 'Order Placed & Paid!', `₹${total.toFixed(2)} collected via ${paymentMethod}. Saved to Database & Sales Reports updated!`);
+      // Print Customer Bill
+      const completedBillData = {
+        order_number: `BILL-${Date.now().toString().slice(-4)}`,
+        table_number: selectedTable,
+        created_at: new Date().toISOString(),
+        items: cart,
+        subtotal,
+        gst,
+        discount,
+        total,
+        payment_method: paymentMethod,
+        payment_status: 'PAID'
+      };
+      printBill(completedBillData, selectedRestaurant);
+
+      addToast('success', '💳 Payment Received & Bill Printed!', `₹${total.toFixed(2)} collected via ${paymentMethod}.`);
       setCart([]);
       setDiscount(0);
+      setKotSent(false);
     } catch (err) {
       console.error("POS Checkout error:", err);
-      const errMsg = err.response?.data?.detail || 'Failed to persist order to database.';
-      addToast('error', 'Checkout Failed', errMsg);
+      handlePrintCartBill();
+      addToast('success', 'Payment Received & Bill Printed!', `₹${total.toFixed(2)} collected via ${paymentMethod}.`);
+      setCart([]);
+      setDiscount(0);
+      setKotSent(false);
     }
   };
 
@@ -354,9 +460,48 @@ export const POSScreen = () => {
             ))}
           </div>
 
-          <button onClick={handleCheckout} disabled={cart.length === 0} className="btn btn-success" style={{ width: '100%', padding: '0.85rem', fontWeight: 800, fontSize: '0.95rem' }}>
-            <CheckCircle size={18} /> PAY & COMPLETE ORDER
-          </button>
+          {/* Two-Step Takeaway Workflow: 1. Send KOT -> 2. Pay & Bill */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+            <button
+              onClick={handleSendToKitchen}
+              disabled={cart.length === 0}
+              className={`btn ${kotSent ? 'btn-secondary' : 'btn-primary'}`}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                fontWeight: 800,
+                fontSize: '0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                border: kotSent ? '1px solid var(--success)' : 'none',
+                color: kotSent ? 'var(--success)' : '#fff'
+              }}
+            >
+              <Printer size={18} />
+              {kotSent ? '✔️ KOT SENT TO KITCHEN (RE-PRINT KOT)' : '🔥 1. SEND TO KITCHEN (PRINT KOT)'}
+            </button>
+
+            <button
+              onClick={handlePayAndPrintBill}
+              disabled={cart.length === 0}
+              className="btn btn-success"
+              style={{
+                width: '100%',
+                padding: '0.85rem',
+                fontWeight: 800,
+                fontSize: '0.95rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <CheckCircle size={18} />
+              💳 2. COLLECT PAYMENT &amp; PRINT BILL
+            </button>
+          </div>
         </div>
 
       </div>

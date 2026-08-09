@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
-import { Layers, Clock, CheckCircle2, Eye, CreditCard, XCircle, AlertTriangle, X } from 'lucide-react';
+import { printKOT, printBill } from '../../services/printService';
+import { Layers, Clock, CheckCircle2, Eye, CreditCard, XCircle, AlertTriangle, X, Printer, Receipt } from 'lucide-react';
 
 export const OrdersModule = () => {
   const { selectedRestaurant, addToast } = useAuth();
@@ -145,8 +146,25 @@ export const OrdersModule = () => {
                 </span>
               </div>
 
-              {/* Action Steppers & Cancel Button */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {/* Action Steppers, Thermal Print & Cancel Buttons */}
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                  onClick={() => printKOT(order, selectedRestaurant)}
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '0.4rem 0.6rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                  title="Print KOT to HP Thermal Printer"
+                >
+                  <Printer size={13} /> KOT
+                </button>
+                <button
+                  onClick={() => printBill(order, selectedRestaurant)}
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '0.4rem 0.6rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                  title="Print Bill to HP Thermal Printer"
+                >
+                  <Receipt size={13} /> Bill
+                </button>
+
                 {order.status === 'pending' && (
                   <button onClick={() => handleUpdateStatus(order.id, 'in_kitchen')} className="btn btn-primary btn-sm" style={{ flex: 1 }}>
                     Send to Kitchen
@@ -163,8 +181,8 @@ export const OrdersModule = () => {
                   </button>
                 )}
                 {order.status !== 'cancelled' && order.status !== 'served' && (
-                  <button onClick={() => setCancellingOrder(order)} className="btn btn-danger btn-sm" style={{ padding: '0.4rem 0.75rem' }} title="Cancel Order">
-                    <XCircle size={14} /> Cancel
+                  <button onClick={() => setCancellingOrder(order)} className="btn btn-danger btn-sm" style={{ padding: '0.4rem 0.6rem' }} title="Cancel Order">
+                    <XCircle size={14} />
                   </button>
                 )}
               </div>
