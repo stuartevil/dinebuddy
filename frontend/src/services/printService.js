@@ -92,12 +92,13 @@ export const printKOT = (order, restaurant = {}) => {
       <style>
         @page {
           size: 80mm auto;
-          margin: 0mm;
+          margin: 0mm 0.2in 0mm 0mm;
         }
         body {
-          width: 78mm;
+          width: 76mm;
           margin: 0 auto;
-          padding: 8px 4px;
+          padding: 8px 0.2in 8px 4px;
+          padding-right: 0.2in;
           font-family: 'Courier New', Courier, monospace, sans-serif;
           font-size: 13px;
           color: #000;
@@ -254,12 +255,13 @@ export const printBill = (bill, restaurant = {}) => {
       <style>
         @page {
           size: 80mm auto;
-          margin: 0mm;
+          margin: 0mm 0.2in 0mm 0mm;
         }
         body {
-          width: 78mm;
+          width: 76mm;
           margin: 0 auto;
-          padding: 8px 4px;
+          padding: 8px 0.2in 8px 4px;
+          padding-right: 0.2in;
           font-family: 'Courier New', Courier, monospace, sans-serif;
           font-size: 12px;
           color: #000;
