@@ -29,8 +29,9 @@ export const POSScreen = () => {
   const [paymentMethod, setPaymentMethod] = useState('UPI');
   const [cart, setCart] = useState([]);
   const [kotSent, setKotSent] = useState(false);
+  const [restaurantTaxRate, setRestaurantTaxRate] = useState(5);
 
-  // Fetch real categories, menu items, and tables from backend
+  // Fetch real categories, menu items, tables, and tax settings from backend
   useEffect(() => {
     if (!selectedRestaurant) {
       setLoading(false);
@@ -40,14 +41,27 @@ export const POSScreen = () => {
     setLoading(true);
     const restId = selectedRestaurant.id;
 
+    // Load local cache immediately for instant tax update
+    const savedLocalTax = localStorage.getItem(`dinebuddy_tax_rate_${restId}`);
+    if (savedLocalTax !== null && savedLocalTax !== undefined) {
+      setRestaurantTaxRate(parseFloat(savedLocalTax));
+    }
+
     Promise.all([
       api.get(`/restaurants/${restId}/menu-categories/`).catch(() => ({ data: [] })),
       api.get(`/restaurants/${restId}/menu-items/`).catch(() => ({ data: [] })),
       api.get(`/tables/restaurant/${restId}`).catch(() => ({ data: [] })),
-    ]).then(([catRes, itemsRes, tablesRes]) => {
+      api.get(`/restaurants/${restId}/settings`).catch(() => ({ data: {} })),
+    ]).then(([catRes, itemsRes, tablesRes, settingsRes]) => {
       const catList = Array.isArray(catRes.data) ? catRes.data : catRes.data?.data || [];
       const itemList = Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data?.data || [];
       const tableList = Array.isArray(tablesRes.data) ? tablesRes.data : tablesRes.data?.data || [];
+
+      if (settingsRes.data && settingsRes.data.tax_percentage !== undefined && settingsRes.data.tax_percentage !== null) {
+        const fetchedTax = parseFloat(settingsRes.data.tax_percentage);
+        setRestaurantTaxRate(fetchedTax);
+        localStorage.setItem(`dinebuddy_tax_rate_${restId}`, String(fetchedTax));
+      }
 
       setCategories(catList);
       setMenuItems(itemList);
@@ -90,7 +104,7 @@ export const POSScreen = () => {
   };
 
   const subtotal = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
-  const taxRate = selectedRestaurant?.tax_rate !== undefined ? parseFloat(selectedRestaurant.tax_rate) : 5;
+  const taxRate = restaurantTaxRate !== null && restaurantTaxRate !== undefined ? restaurantTaxRate : 5;
   const gst = subtotal * (taxRate / 100);
   const total = Math.max(0, subtotal + gst - discount);
 
@@ -102,7 +116,7 @@ export const POSScreen = () => {
       created_at: new Date().toISOString(),
       items: cart
     };
-    printKOT(orderData, selectedRestaurant);
+    printKOT(orderData, { ...selectedRestaurant, tax_rate: taxRate });
   };
 
   const handlePrintCartBill = () => {
@@ -119,7 +133,7 @@ export const POSScreen = () => {
       payment_method: paymentMethod,
       payment_status: 'PAID'
     };
-    printBill(billData, selectedRestaurant);
+    printBill(billData, { ...selectedRestaurant, tax_rate: taxRate });
   };
 
   const handleSendToKitchen = async () => {
@@ -164,7 +178,7 @@ export const POSScreen = () => {
         created_at: new Date().toISOString(),
         items: cart
       };
-      printKOT(orderData, selectedRestaurant);
+      printKOT(orderData, { ...selectedRestaurant, tax_rate: taxRate });
 
       setKotSent(true);
       addToast('info', '🔥 KOT Printed & Sent to Kitchen!', 'Kitchen is preparing food. Click "Pay & Print Bill" when customer pays.');
@@ -234,7 +248,7 @@ export const POSScreen = () => {
         payment_method: paymentMethod,
         payment_status: 'PAID'
       };
-      printBill(completedBillData, selectedRestaurant);
+      printBill(completedBillData, { ...selectedRestaurant, tax_rate: taxRate });
 
       addToast('success', '💳 Payment Received & Bill Printed!', `₹${total.toFixed(2)} collected via ${paymentMethod}.`);
       setCart([]);
