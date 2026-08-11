@@ -122,7 +122,7 @@ export const CustomerQRApp = () => {
     }
 
     setIsVerifying(true);
-    const formattedPhone = cleanPhone.length === 10 ? `+91${cleanPhone}` : `+${cleanPhone}`;
+    const formattedPhone = `+91${cleanPhone.slice(-10)}`;
 
     try {
       setupRecaptcha();
@@ -371,16 +371,31 @@ export const CustomerQRApp = () => {
 
                 <div>
                   <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>Mobile Number *</label>
-                  <div style={{ position: 'relative' }}>
-                    <Phone size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      color: 'var(--accent-primary)',
+                      borderRight: '1px solid var(--border-color)',
+                      paddingRight: '8px'
+                    }}>
+                      <span>🇮🇳</span>
+                      <span>+91</span>
+                    </div>
                     <input
                       type="tel"
+                      maxLength={10}
                       required
                       className="input-control"
-                      style={{ paddingLeft: '2.4rem' }}
+                      style={{ paddingLeft: '4.8rem' }}
                       placeholder="9876543210"
                       value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, ''))}
                     />
                   </div>
                 </div>
