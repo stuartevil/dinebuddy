@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     health, restaurant, user_restaurant, menu_category, 
     menu_items, menu_item_variant, user, auth, opt_auth,
-    table, billing, inventory, reports, upload
+    table, billing, inventory, reports, upload, public_customer
 )
 
 api_router = APIRouter()
@@ -22,3 +22,4 @@ api_router.include_router(billing.router, tags=["Dine-In Billing & Sessions"])
 api_router.include_router(inventory.router, tags=["Inventory & Stock Management"])
 api_router.include_router(reports.router, tags=["Sales Reports & Analytics"])
 api_router.include_router(upload.router, tags=["File Uploads"])
+api_router.include_router(public_customer.router, tags=["Public Customer QR"])

@@ -23,6 +23,7 @@ export const TableManagement = () => {
 
   // Selected table management modal state
   const [selectedTable, setSelectedTable] = useState(null);
+  const [qrModalTable, setQrModalTable] = useState(null);
   const [tableOrders, setTableOrders] = useState({}); // { [tableId]: [ { id, name, price, qty } ] }
 
   // Add Table Modal state
@@ -280,9 +281,16 @@ export const TableManagement = () => {
                   </span>
                 </div>
 
-                {/* QR Token Box */}
-                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.4rem', borderRadius: 'var(--radius-sm)', textAlign: 'center', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.72rem', marginBottom: '1rem' }}>
-                  QR TOKEN: {tbl.qr_code_token || `TBL-${tbl.id}`}
+                {/* QR Token Box & Sticker Button */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.72rem', marginBottom: '1rem' }}>
+                  <span>QR: {tbl.qr_code_token || `TBL-${tbl.id}`}</span>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setQrModalTable(tbl); }}
+                    className="btn btn-secondary btn-sm"
+                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                  >
+                    <QrCode size={12} /> QR Code
+                  </button>
                 </div>
 
                 {/* Manage & Delete Buttons */}
@@ -461,6 +469,60 @@ export const TableManagement = () => {
                 <button type="submit" className="btn btn-primary">Add Table to DB</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Table QR Code Sticker Modal */}
+      {qrModalTable && (
+        <div className="modal-backdrop">
+          <div className="modal-box" style={{ maxWidth: '420px', textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Table QR Code Sticker</h3>
+              <button onClick={() => setQrModalTable(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '16px', display: 'inline-block', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', marginBottom: '1.25rem' }}>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`${window.location.origin}/order/table/${qrModalTable.id}`)}`}
+                alt={`Table ${qrModalTable.table_number} QR Code`}
+                style={{ width: '180px', height: '180px', display: 'block', margin: '0 auto' }}
+              />
+              <div style={{ marginTop: '0.75rem', color: '#1e293b', fontWeight: 800, fontSize: '1.1rem' }}>
+                {selectedRestaurant?.name || 'DineBuddy'}
+              </div>
+              <div style={{ color: '#6366f1', fontWeight: 800, fontSize: '1.3rem' }}>
+                {qrModalTable.table_number}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                Scan to View Menu & Order
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/order/table/${qrModalTable.id}`);
+                  addToast('success', 'Link Copied', 'Customer menu link copied to clipboard!');
+                }}
+                className="btn btn-primary"
+                style={{ width: '100%' }}
+              >
+                📋 Copy Customer Menu Link
+              </button>
+              
+              <a
+                href={`${window.location.origin}/order/table/${qrModalTable.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-secondary"
+                style={{ width: '100%', textDecoration: 'none', textAlign: 'center' }}
+              >
+                🌐 Test Customer Menu in New Tab
+              </a>
+            </div>
           </div>
         </div>
       )}

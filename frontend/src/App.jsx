@@ -25,15 +25,29 @@ import { ReportsAnalytics } from './views/restaurant_admin/ReportsAnalytics';
 import { StaffManagement } from './views/restaurant_admin/StaffManagement';
 import { RestaurantSettings } from './views/restaurant_admin/RestaurantSettings';
 import { StaffDashboard } from './views/staff/StaffDashboard';
+import { CustomerQRApp } from './views/customer/CustomerQRApp';
 
 const ShellContent = () => {
   const { currentUser, activeRole, canAccessReports, canAccessInventory, restaurants, selectedRestaurant } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Public routes check (Customer QR Menu)
+  const isCustomerPublicRoute = location.pathname.startsWith('/order/table/') || location.pathname.startsWith('/menu/');
+
+  if (isCustomerPublicRoute) {
+    return (
+      <Routes>
+        <Route path="/order/table/:tableId" element={<CustomerQRApp />} />
+        <Route path="/menu/:tableId" element={<CustomerQRApp />} />
+      </Routes>
+    );
+  }
+
   const handleNavigate = (path) => {
     navigate(path);
   };
+
 
   // Default route resolver by role
   const getDefaultRoute = () => {
