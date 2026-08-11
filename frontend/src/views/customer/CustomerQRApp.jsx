@@ -130,17 +130,22 @@ export const CustomerQRApp = () => {
       const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
       setConfirmationResult(result);
       setOtpSent(true);
+      setAuthError('');
     } catch (err) {
-      console.warn('Firebase SMS OTP Error / Dev Mode Fallback:', err);
-      // Fallback dev mode OTP if domain is not whitelisted yet in Firebase Console
-      setOtpSent(true);
-      setAuthError('Real Firebase SMS sent (or use demo code 123456 in dev mode).');
+      console.error('Firebase SMS OTP Error:', err);
+      let errorMsg = err?.message || 'Failed to send SMS OTP.';
+      if (err?.code === 'auth/invalid-phone-number') {
+        errorMsg = 'Invalid phone number format.';
+      } else if (err?.code === 'auth/captcha-check-failed' || err?.code === 'auth/unauthorized-domain') {
+        errorMsg = 'Domain not authorized in Firebase Console -> Authentication -> Settings -> Authorized domains.';
+      }
+      setAuthError(`Firebase SMS Error: ${errorMsg}`);
     } finally {
       setIsVerifying(false);
     }
   };
 
-  // Step 1: Verify Firebase OTP Code & Unlock Menu
+  // Step 1: Verify Strict Firebase OTP Code & Unlock Menu
   const handleVerifyOtpAndProceed = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -150,25 +155,26 @@ export const CustomerQRApp = () => {
       return;
     }
 
+    if (!confirmationResult) {
+      setAuthError('Please request OTP first.');
+      return;
+    }
+
+    if (!otpCode || otpCode.trim().length !== 6) {
+      setAuthError('Please enter the 6-digit SMS OTP received on your mobile phone.');
+      return;
+    }
+
     setIsVerifying(true);
 
     try {
-      if (confirmationResult && otpCode.length === 6) {
-        await confirmationResult.confirm(otpCode.trim());
-      }
-      
+      await confirmationResult.confirm(otpCode.trim());
       const sessionData = { name: customerName.trim(), phone: customerPhone.trim() };
       sessionStorage.setItem(`dinebuddy_customer_table_${tableId}`, JSON.stringify(sessionData));
       setCurrentStep(2); // Move to Step 2: Digital Menu
     } catch (err) {
-      // Dev mode code check
-      if (otpCode.trim() === '1234' || otpCode.trim() === '123456') {
-        const sessionData = { name: customerName.trim(), phone: customerPhone.trim() };
-        sessionStorage.setItem(`dinebuddy_customer_table_${tableId}`, JSON.stringify(sessionData));
-        setCurrentStep(2);
-      } else {
-        setAuthError('Invalid OTP code. Please enter correct code received via SMS.');
-      }
+      console.error('Firebase OTP Verification Error:', err);
+      setAuthError('Invalid OTP code. Please enter the exact 6-digit code received via SMS.');
     } finally {
       setIsVerifying(false);
     }
