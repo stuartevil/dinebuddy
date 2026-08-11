@@ -105,7 +105,7 @@ export const Sidebar = ({ activeRoute: customActiveRoute, setActiveRoute: custom
   const logoUrl = selectedRestaurant?.logo_url ? getMediaUrl(selectedRestaurant.logo_url) : null;
 
   return (
-    <aside className="panel-card" style={{ width: '260px', borderRadius: 0, borderTop: 0, borderBottom: 0, borderLeft: 0, padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <aside className="panel-card app-sidebar" style={{ width: '260px', borderRadius: 0, borderTop: 0, borderBottom: 0, borderLeft: 0, padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
       
       {/* Sidebar Header: Full Restaurant Logo Box */}
       <div style={{ padding: '0.25rem 0.25rem 1rem 0.25rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem' }}>

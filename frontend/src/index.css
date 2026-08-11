@@ -334,3 +334,86 @@ h1, h2, h3, h4, h5, h6 {
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ==========================================================================
+   MOBILE & TABLET RESPONSIVE STYLES (iOS / Android / Touch Optimized)
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .content-container {
+    padding: 1.25rem 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .app-sidebar {
+    width: 100% !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: 0.75rem 0.65rem !important;
+  }
+
+  .app-sidebar nav {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    gap: 0.35rem !important;
+    padding-bottom: 0.25rem !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-sidebar nav button {
+    white-space: nowrap !important;
+    width: auto !important;
+    padding: 0.4rem 0.75rem !important;
+    font-size: 0.78rem !important;
+    border-radius: 9999px !important;
+  }
+
+  .main-wrapper {
+    width: 100%;
+  }
+
+  .content-container {
+    padding: 1rem 0.75rem;
+  }
+
+  /* Responsive Grid Adjustments */
+  .grid-cols-4, .grid-cols-3, .grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Touch Targets for Mobile Devices */
+  .btn {
+    min-height: 44px;
+  }
+
+  .input-control, .select-control {
+    min-height: 44px;
+    font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
+  }
+
+  /* Responsive Modal Box */
+  .modal-box {
+    padding: 1.25rem !important;
+    max-width: 95vw !important;
+    border-radius: var(--radius-lg) !important;
+  }
+
+  /* Responsive Data Tables */
+  .data-table th, .data-table td {
+    padding: 0.75rem 0.65rem !important;
+    font-size: 0.8rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .content-container {
+    padding: 0.75rem 0.5rem;
+  }
+}
+
