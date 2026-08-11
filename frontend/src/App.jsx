@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth, ROLES } from './context/AuthContext';
 import { LoginScreen } from './views/auth/LoginScreen';
 import { Navbar } from './components/shell/Navbar';
@@ -8,7 +9,7 @@ import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { AccessDenied } from './components/common/AccessDenied';
 import { NoRestaurantAssigned } from './components/common/NoRestaurantAssigned';
 
-// View Imports — only views backed by actual backend endpoints
+// View Imports — views backed by actual backend endpoints
 import { SuperadminDashboard } from './views/superadmin/SuperadminDashboard';
 import { OwnerDashboardHome } from './views/restaurant_admin/OwnerDashboardHome';
 import { POSScreen } from './views/restaurant_admin/POSScreen';
@@ -25,122 +26,103 @@ import { StaffManagement } from './views/restaurant_admin/StaffManagement';
 import { RestaurantSettings } from './views/restaurant_admin/RestaurantSettings';
 import { StaffDashboard } from './views/staff/StaffDashboard';
 
-
 const ShellContent = () => {
   const { currentUser, activeRole, canAccessReports, canAccessInventory, restaurants, selectedRestaurant } = useAuth();
-  const [activeRoute, setActiveRoute] = useState('/restaurant/dashboard');
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Reset default route when role changes
-  useEffect(() => {
-    if (!activeRole) return;
+  const handleNavigate = (path) => {
+    navigate(path);
+  };
+
+  // Default route resolver by role
+  const getDefaultRoute = () => {
     switch (activeRole) {
       case ROLES.SUPERADMIN:
-        setActiveRoute('/admin/dashboard');
-        break;
+        return '/admin/dashboard';
       case ROLES.RESTAURANT_ADMIN:
-        setActiveRoute('/restaurant/dashboard');
-        break;
+        return '/restaurant/dashboard';
       case ROLES.RESTAURANT_STAFF:
-        setActiveRoute('/staff/dashboard');
-        break;
+        return '/staff/dashboard';
       default:
-        setActiveRoute('/restaurant/dashboard');
+        return '/restaurant/dashboard';
     }
-  }, [activeRole]);
+  };
+
+  // Redirect root or invalid routes when logged in
+  useEffect(() => {
+    if (currentUser && location.pathname === '/') {
+      navigate(getDefaultRoute(), { replace: true });
+    }
+  }, [currentUser, activeRole, location.pathname]);
 
   // Not authenticated → render Login Screen
   if (!currentUser) {
     return <LoginScreen />;
   }
 
-  // Route Resolver & Permission Guard
-  const renderResolvedView = () => {
+  // If on /login while authenticated → redirect to role home
+  if (location.pathname === '/login') {
+    return <Navigate to={getDefaultRoute()} replace />;
+  }
 
-    // 1. SUPERADMIN — platform management
-    if (activeRole === ROLES.SUPERADMIN) {
-      return <SuperadminDashboard activeRoute={activeRoute} />;
-    }
-
-    // 2. Restaurant admin/staff — check if any restaurant exists in DB
-    if (!selectedRestaurant || restaurants.length === 0) {
-      return <NoRestaurantAssigned />;
-    }
-
-    // 3. Route resolution for RESTAURANT_ADMIN & RESTAURANT_STAFF
-    switch (activeRoute) {
-
-      case '/restaurant/dashboard':
-        return <OwnerDashboardHome setActiveRoute={setActiveRoute} />;
-
-      case '/restaurant/pos':
-      case '/staff/pos':
-        return <POSScreen />;
-
-      case '/restaurant/orders':
-      case '/staff/orders':
-        return <OrdersModule />;
-
-      case '/restaurant/tables':
-      case '/staff/tables':
-        return <TableManagement />;
-
-      case '/restaurant/kitchen':
-      case '/staff/kitchen':
-        return <KDSView />;
-
-      case '/restaurant/menu':
-      case '/staff/menu':
-        return <MenuManagement />;
-
-      // Owner-only protected routes (backend: /inventory/, /reports/)
-      case '/restaurant/recipes':
-        return canAccessInventory
-          ? <RecipeBOMManagement />
-          : <AccessDenied onGoBack={() => setActiveRoute('/staff/dashboard')} />;
-
-      case '/restaurant/inventory':
-        return canAccessInventory
-          ? <InventoryDashboard />
-          : <AccessDenied onGoBack={() => setActiveRoute('/staff/dashboard')} />;
-
-      case '/restaurant/transactions':
-        return canAccessInventory
-          ? <StockTransactions />
-          : <AccessDenied onGoBack={() => setActiveRoute('/staff/dashboard')} />;
-
-      case '/restaurant/alerts':
-        return canAccessInventory
-          ? <LowStockAlertCenter setActiveRoute={setActiveRoute} />
-          : <AccessDenied onGoBack={() => setActiveRoute('/staff/dashboard')} />;
-
-      case '/restaurant/reports':
-        return canAccessReports
-          ? <ReportsAnalytics />
-          : <AccessDenied onGoBack={() => setActiveRoute('/staff/dashboard')} />;
-
-      case '/restaurant/staff':
-        return <StaffManagement />;
-
-      case '/restaurant/settings':
-        return <RestaurantSettings />;
-
-      case '/staff/dashboard':
-        return <StaffDashboard setActiveRoute={setActiveRoute} />;
-
-      default:
-        return activeRole === ROLES.RESTAURANT_STAFF
-          ? <StaffDashboard setActiveRoute={setActiveRoute} />
-          : <OwnerDashboardHome setActiveRoute={setActiveRoute} />;
-    }
-  };
+  // Restaurant admin/staff without assigned restaurant
+  if (activeRole !== ROLES.SUPERADMIN && (!selectedRestaurant || restaurants.length === 0)) {
+    return (
+      <div className="app-shell">
+        <Sidebar activeRoute={location.pathname} setActiveRoute={handleNavigate} />
+        <div className="main-wrapper">
+          <Navbar />
+          <main className="content-container">
+            <NoRestaurantAssigned />
+          </main>
+        </div>
+        <ToastContainer />
+        <ConfirmDialog />
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
-      <Sidebar activeRoute={activeRoute} setActiveRoute={setActiveRoute} />
+      <Sidebar activeRoute={location.pathname} setActiveRoute={handleNavigate} />
       <div className="main-wrapper">
         <Navbar />
         <main className="content-container">
-          {renderResolvedView()}
+          <Routes>
+            {/* SUPERADMIN Routes */}
+            {activeRole === ROLES.SUPERADMIN && (
+              <Route path="/admin/*" element={<SuperadminDashboard activeRoute={location.pathname} setActiveRoute={handleNavigate} />} />
+            )}
+
+            {/* RESTAURANT_ADMIN & RESTAURANT_STAFF Routes */}
+            <Route path="/restaurant/dashboard" element={<OwnerDashboardHome setActiveRoute={handleNavigate} />} />
+            <Route path="/restaurant/pos" element={<POSScreen />} />
+            <Route path="/staff/pos" element={<POSScreen />} />
+            <Route path="/restaurant/orders" element={<OrdersModule />} />
+            <Route path="/staff/orders" element={<OrdersModule />} />
+            <Route path="/restaurant/tables" element={<TableManagement />} />
+            <Route path="/staff/tables" element={<TableManagement />} />
+            <Route path="/restaurant/kitchen" element={<KDSView />} />
+            <Route path="/staff/kitchen" element={<KDSView />} />
+            <Route path="/restaurant/menu" element={<MenuManagement />} />
+            <Route path="/staff/menu" element={<MenuManagement />} />
+
+            {/* Owner-only Protected Routes */}
+            <Route path="/restaurant/recipes" element={canAccessInventory ? <RecipeBOMManagement /> : <AccessDenied onGoBack={() => handleNavigate('/staff/dashboard')} />} />
+            <Route path="/restaurant/inventory" element={canAccessInventory ? <InventoryDashboard /> : <AccessDenied onGoBack={() => handleNavigate('/staff/dashboard')} />} />
+            <Route path="/restaurant/transactions" element={canAccessInventory ? <StockTransactions /> : <AccessDenied onGoBack={() => handleNavigate('/staff/dashboard')} />} />
+            <Route path="/restaurant/alerts" element={canAccessInventory ? <LowStockAlertCenter setActiveRoute={handleNavigate} /> : <AccessDenied onGoBack={() => handleNavigate('/staff/dashboard')} />} />
+            <Route path="/restaurant/reports" element={canAccessReports ? <ReportsAnalytics /> : <AccessDenied onGoBack={() => handleNavigate('/staff/dashboard')} />} />
+            <Route path="/restaurant/staff" element={<StaffManagement />} />
+            <Route path="/restaurant/settings" element={<RestaurantSettings />} />
+
+            {/* Staff Dashboard Route */}
+            <Route path="/staff/dashboard" element={<StaffDashboard setActiveRoute={handleNavigate} />} />
+
+            {/* Fallback Catch-all Route */}
+            <Route path="*" element={<Navigate to={getDefaultRoute()} replace />} />
+          </Routes>
         </main>
       </div>
       <ToastContainer />
@@ -156,3 +138,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

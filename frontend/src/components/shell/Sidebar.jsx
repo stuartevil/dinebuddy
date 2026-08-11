@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getMediaUrl } from '../../services/apiClient';
 import { 
@@ -19,9 +20,19 @@ import {
   UserCheck
 } from 'lucide-react';
 
-export const Sidebar = ({ activeRoute, setActiveRoute }) => {
+export const Sidebar = ({ activeRoute: customActiveRoute, setActiveRoute: customSetActiveRoute }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { activeRole, selectedRestaurant, ROLES } = useAuth();
   const [logoError, setLogoError] = useState(false);
+
+  const activeRoute = customActiveRoute || location.pathname;
+  const handleNavigate = (path) => {
+    if (customSetActiveRoute) {
+      customSetActiveRoute(path);
+    }
+    navigate(path);
+  };
 
   useEffect(() => {
     setLogoError(false);
@@ -156,7 +167,7 @@ export const Sidebar = ({ activeRoute, setActiveRoute }) => {
           return (
             <button
               key={item.id}
-              onClick={() => setActiveRoute(item.id)}
+              onClick={() => handleNavigate(item.id)}
               className="btn"
               style={{
                 justifyContent: 'flex-start',
