@@ -9,6 +9,7 @@ from app.models.restaurant import Restaurant
 from app.models.menu_category import MenuCategory
 from app.models.menu_items import MenuItem
 from app.models.customer import Customer
+from app.models.order import Order
 from app.schemas.order import OrderCreate, OrderResponse
 from app.services.billing_service import BillingService
 
@@ -145,4 +146,18 @@ def place_public_customer_order(
 
     # Add order to session
     order = BillingService.add_order_to_session(db, table_id, order_create_payload)
+    return order
+
+
+@router.get("/orders/{order_id}/status", response_model=OrderResponse)
+def get_public_order_status(order_id: int, db: Session = Depends(get_db)):
+    """
+    Public endpoint for customers to track real-time order status (pending, in_kitchen, ready, served).
+    """
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order ticket not found."
+        )
     return order

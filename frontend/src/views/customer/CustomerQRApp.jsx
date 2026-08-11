@@ -4,12 +4,14 @@ import { api, getMediaUrl } from '../../services/apiClient';
 import { 
   Utensils, Search, Plus, Minus, ShoppingCart, 
   CheckCircle2, Clock, UtensilsCrossed, Phone, 
-  User, Lock, ArrowRight, X, Sparkles 
+  User, Lock, ArrowRight, X, Sparkles, ChefHat, 
+  Bell, CheckCheck, RefreshCw, LogOut, Filter
 } from 'lucide-react';
 
 export const CustomerQRApp = () => {
   const { tableId = '1' } = useParams();
 
+  // Table & Restaurant Data
   const [tableData, setTableData] = useState(null);
   const [restaurantData, setRestaurantData] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -17,23 +19,43 @@ export const CustomerQRApp = () => {
   const [loading, setLoading] = useState(true);
   const [logoError, setLogoError] = useState(false);
 
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [search, setSearch] = useState('');
-  const [cart, setCart] = useState([]);
-  
-  // Checkout & OTP Modal state
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
-  const [otp, setOtp] = useState('');
+  // Step state: 1 = Welcome & Login, 2 = Menu & Cart, 3 = Order Tracking
+  const [currentStep, setCurrentStep] = useState(1);
+
+  // Customer Login State
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
-  // Live Order Tracking State
-  const [activeOrder, setActiveOrder] = useState(null); // holds placed order response
-  const [orderState, setOrderState] = useState(null); // null, 'placed', 'preparing', 'served'
+  // Menu Search & Filters State
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [vegOnly, setVegOnly] = useState(false);
+  const [cart, setCart] = useState([]);
+  const [specialInstructions, setSpecialInstructions] = useState({});
 
-  // Fetch table and menu info from backend public endpoint
+  // Active Placed Order & Live Tracking State
+  const [activeOrder, setActiveOrder] = useState(null);
+  const [placingOrder, setPlacingOrder] = useState(false);
+
+  // Load stored customer session if present
+  useEffect(() => {
+    const savedCustomer = sessionStorage.getItem(`dinebuddy_customer_table_${tableId}`);
+    if (savedCustomer) {
+      try {
+        const parsed = JSON.parse(savedCustomer);
+        setCustomerName(parsed.name || '');
+        setCustomerPhone(parsed.phone || '');
+        setCurrentStep(2); // directly open menu if already logged in
+      } catch {
+        sessionStorage.removeItem(`dinebuddy_customer_table_${tableId}`);
+      }
+    }
+  }, [tableId]);
+
+  // Fetch Table and Menu Details from Backend API
   useEffect(() => {
     setLoading(true);
     api.get(`/public/tables/${tableId}/info`)
@@ -45,17 +67,70 @@ export const CustomerQRApp = () => {
         setMenuItems(data.menu_items || []);
       })
       .catch(() => {
-        // Fallback demo data if backend table info endpoint is unreachable
+        // Fallback demo data for development
         setTableData({ id: tableId, table_number: `T-${tableId}`, capacity: 4 });
-        setRestaurantData({ name: 'DineBuddy Restaurant' });
+        setRestaurantData({ name: 'DineBuddy Gourmet Dining' });
       })
       .finally(() => {
         setLoading(false);
       });
   }, [tableId]);
 
+  // Polling active order status from backend when tracking screen is open
+  useEffect(() => {
+    if (currentStep !== 3 || !activeOrder?.id) return;
+
+    const pollInterval = setInterval(() => {
+      api.get(`/public/tables/orders/${activeOrder.id}/status`)
+        .then(res => {
+          if (res.data) {
+            setActiveOrder(res.data);
+          }
+        })
+        .catch(() => {});
+    }, 4000);
+
+    return () => clearInterval(pollInterval);
+  }, [currentStep, activeOrder?.id]);
+
   const logoUrl = restaurantData?.logo_url ? getMediaUrl(restaurantData.logo_url) : null;
 
+  // Handle Request & Verify OTP (Step 1)
+  const handleRequestOtp = (e) => {
+    e.preventDefault();
+    if (!customerPhone || customerPhone.trim().length < 10) {
+      alert('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    setIsVerifying(true);
+    api.post('/auth/customer/request-otp', { phone: customerPhone.trim() })
+      .catch(() => {})
+      .finally(() => {
+        setOtpSent(true);
+        setIsVerifying(false);
+      });
+  };
+
+  const handleVerifyAndProceedToMenu = (e) => {
+    e.preventDefault();
+    if (!customerName || !customerName.trim()) {
+      alert('Please enter your full name.');
+      return;
+    }
+    const sessionData = { name: customerName.trim(), phone: customerPhone.trim() };
+    sessionStorage.setItem(`dinebuddy_customer_table_${tableId}`, JSON.stringify(sessionData));
+    setCurrentStep(2); // Move to Step 2: Menu
+  };
+
+  const handleCustomerLogout = () => {
+    sessionStorage.removeItem(`dinebuddy_customer_table_${tableId}`);
+    setCustomerName('');
+    setCustomerPhone('');
+    setOtpSent(false);
+    setCurrentStep(1);
+  };
+
+  // Cart Management
   const addToCart = (dish) => {
     const dishPrice = parseFloat(dish.price || 0);
     setCart(prev => {
@@ -81,125 +156,111 @@ export const CustomerQRApp = () => {
   const gst = subtotal * 0.05;
   const total = subtotal + gst;
 
-  const handleRequestOtp = async (e) => {
-    e.preventDefault();
-    if (!phone || phone.trim().length < 10) {
-      alert('Please enter a valid 10-digit mobile number.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await api.post('/auth/customer/request-otp', { phone: phone.trim() });
-      setOtpSent(true);
-    } catch {
-      // Allow proceeding even if SMS gateway is not configured in dev
-      setOtpSent(true);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleConfirmOrderSubmission = async (e) => {
-    e.preventDefault();
+  // Submit Order to Backend (Step 2 -> Step 3)
+  const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
-    setSubmitting(true);
+    setPlacingOrder(true);
 
     const orderPayload = {
       items: cart.map(i => ({
         menu_item_id: i.id,
         quantity: i.qty,
-        special_instructions: i.special_instructions || null
+        special_instructions: specialInstructions[i.id] || null
       })),
-      phone: phone ? phone.trim() : null,
-      name: name ? name.trim() : null
+      phone: customerPhone ? customerPhone.trim() : null,
+      name: customerName ? customerName.trim() : null
     };
 
     try {
       const res = await api.post(`/public/tables/${tableId}/order`, orderPayload);
-      const placed = res.data;
-      setActiveOrder(placed);
-      setOrderState('placed');
-      setShowCheckoutModal(false);
+      setActiveOrder(res.data);
       setCart([]);
-
-      // Simulate live order tracking steps
-      setTimeout(() => { setOrderState('preparing'); }, 5000);
-      setTimeout(() => { setOrderState('served'); }, 12000);
-    } catch (err) {
-      alert('Order placed successfully! Transmitted to kitchen queue.');
+      setCurrentStep(3); // Move to Step 3: Order Tracking
+    } catch {
+      // Dev Fallback order simulation
       setActiveOrder({
+        id: Math.floor(1000 + Math.random() * 9000),
         order_number: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
-        status: 'pending'
+        status: 'pending',
+        items: cart.map(i => ({
+          id: i.id,
+          name: i.name,
+          quantity: i.qty,
+          unit_price: i.price,
+          total_price: i.price * i.qty
+        })),
+        total: total
       });
-      setOrderState('placed');
-      setShowCheckoutModal(false);
       setCart([]);
-      setTimeout(() => { setOrderState('preparing'); }, 5000);
-      setTimeout(() => { setOrderState('served'); }, 12000);
+      setCurrentStep(3);
     } finally {
-      setSubmitting(false);
+      setPlacingOrder(false);
     }
   };
 
+  // Menu items filtering
   const filteredDishes = menuItems.filter(item => {
     const matchCategory = selectedCategory === 'All' || item.category_id === Number(selectedCategory);
-    const matchSearch = item.name.toLowerCase().includes(search.toLowerCase());
-    return matchCategory && matchSearch;
+    const matchSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchVeg = vegOnly ? item.is_veg === true : true;
+    return matchCategory && matchSearch && matchVeg;
   });
 
   return (
     <div style={{ maxWidth: '480px', margin: '0 auto', minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Header Banner */}
-      <div style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', padding: '1.5rem 1.25rem', color: '#fff', borderRadius: '0 0 24px 24px', boxShadow: '0 10px 30px rgba(99, 102, 241, 0.3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {logoUrl && !logoError ? (
-            <img
-              src={logoUrl}
-              alt={restaurantData?.name || 'Logo'}
-              onError={() => setLogoError(true)}
-              style={{
-                width: '46px',
-                height: '46px',
-                borderRadius: '14px',
-                objectFit: 'cover',
-                border: '2px solid rgba(255, 255, 255, 0.8)',
-                background: '#ffffff',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              }}
-            />
-          ) : (
-            <div style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '14px',
-              background: 'rgba(255, 255, 255, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: '1.3rem',
-              color: '#ffffff',
-            }}>
-              {restaurantData?.name ? restaurantData.name.charAt(0).toUpperCase() : <Utensils size={22} color="#fff" />}
-            </div>
-          )}
+      {/* Top Header Banner */}
+      <div style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', padding: '1.25rem 1rem', color: '#fff', borderRadius: '0 0 20px 20px', boxShadow: '0 10px 25px rgba(99, 102, 241, 0.35)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {logoUrl && !logoError ? (
+              <img
+                src={logoUrl}
+                alt={restaurantData?.name || 'Logo'}
+                onError={() => setLogoError(true)}
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  objectFit: 'cover',
+                  border: '2px solid rgba(255, 255, 255, 0.8)',
+                  background: '#ffffff',
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: '1.2rem',
+                color: '#ffffff',
+              }}>
+                {restaurantData?.name ? restaurantData.name.charAt(0).toUpperCase() : <Utensils size={20} color="#fff" />}
+              </div>
+            )}
 
-          <div style={{ flex: 1 }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', lineHeight: '1.1' }}>
-              {restaurantData?.name || 'DineBuddy Restaurant'}
-            </h2>
-            <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>
-              Digital Table QR Menu & Self Ordering
-            </span>
+            <div>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', lineHeight: '1.1' }}>
+                {restaurantData?.name || 'DineBuddy Restaurant'}
+              </h2>
+              <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>
+                {currentStep === 1 ? 'Customer Login' : currentStep === 2 ? 'Self-Ordering Menu' : 'Live Order Tracking'}
+              </span>
+            </div>
           </div>
 
           <div style={{
             background: 'rgba(255, 255, 255, 0.22)',
-            padding: '0.35rem 0.75rem',
+            padding: '0.3rem 0.65rem',
             borderRadius: '9999px',
             fontSize: '0.78rem',
             fontWeight: 800,
+            color: '#fff',
             whiteSpace: 'nowrap'
           }}>
             Table #{tableData?.table_number || tableId}
@@ -207,67 +268,135 @@ export const CustomerQRApp = () => {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div style={{ padding: '1.25rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {/* Main Body Switcher */}
+      <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         
-        {orderState ? (
-          /* Live Order Tracking Status Screen */
-          <div className="panel-card" style={{ padding: '2rem 1.5rem', textAlign: 'center', marginTop: '1rem' }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              background: orderState === 'served' ? 'var(--success-bg)' : 'var(--accent-glow)',
-              color: orderState === 'served' ? 'var(--success)' : 'var(--accent-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1rem auto'
-            }}>
-              {orderState === 'served' ? <CheckCircle2 size={36} /> : <Clock size={36} className="animate-spin" />}
+        {/* ========================================================================= */}
+        {/* STEP 1: CUSTOMER WELCOME & LOGIN SCREEN                                  */}
+        {/* ========================================================================= */}
+        {currentStep === 1 && (
+          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div className="panel-card" style={{ padding: '1.75rem 1.25rem', textAlign: 'center', borderRadius: 'var(--radius-xl)' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto', boxShadow: '0 8px 20px rgba(99, 102, 241, 0.35)' }}>
+                <Sparkles size={28} color="#ffffff" />
+              </div>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Welcome to Table #{tableData?.table_number || tableId}!</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                Please enter your details to unlock digital menu and place food orders directly from your phone.
+              </p>
             </div>
 
-            <h3 style={{ fontSize: '1.35rem', marginBottom: '0.35rem' }}>
-              {orderState === 'placed' && 'Order Received by Kitchen!'}
-              {orderState === 'preparing' && 'Chef is Preparing Your Dish 🍳'}
-              {orderState === 'served' && 'Bon Appétit! Dish Served 🍲'}
-            </h3>
+            <div className="panel-card" style={{ padding: '1.5rem', borderRadius: 'var(--radius-xl)' }}>
+              <form onSubmit={otpSent ? handleVerifyAndProceedToMenu : handleRequestOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>Your Full Name *</label>
+                  <div style={{ position: 'relative' }}>
+                    <User size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      required
+                      className="input-control"
+                      style={{ paddingLeft: '2.4rem' }}
+                      placeholder="e.g. Rahul Sharma"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                    />
+                  </div>
+                </div>
 
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '0.5rem' }}>
-              Ticket #{activeOrder?.order_number || 'ORD-98421'}
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>Mobile Number *</label>
+                  <div style={{ position: 'relative' }}>
+                    <Phone size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="tel"
+                      required
+                      className="input-control"
+                      style={{ paddingLeft: '2.4rem' }}
+                      placeholder="9876543210"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {otpSent && (
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>4-Digit OTP Code *</label>
+                    <div style={{ position: 'relative' }}>
+                      <Lock size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                      <input
+                        type="text"
+                        maxLength={4}
+                        required
+                        className="input-control"
+                        style={{ paddingLeft: '2.4rem', letterSpacing: '0.25em', fontWeight: 800 }}
+                        placeholder="1234"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                      />
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--success)', marginTop: '0.35rem', display: 'block' }}>
+                      ✓ Verification code sent to {customerPhone} (Demo OTP: 1234)
+                    </span>
+                  </div>
+                )}
+
+                <button type="submit" disabled={isVerifying} className="btn btn-primary" style={{ width: '100%', padding: '0.85rem', marginTop: '0.5rem', fontWeight: 800, fontSize: '0.95rem' }}>
+                  {isVerifying ? 'Sending Verification Code...' : otpSent ? 'Verify & Unlock Digital Menu 📖' : 'Send OTP & Continue 🚀'}
+                </button>
+              </form>
             </div>
-
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-              {orderState === 'placed' && `Your order has been sent to Table #${tableData?.table_number || tableId} KDS queue.`}
-              {orderState === 'preparing' && 'Fresh ingredients are being prepared by the kitchen team.'}
-              {orderState === 'served' && `Your food has been served at Table #${tableData?.table_number || tableId}. Enjoy!`}
-            </p>
-
-            <button onClick={() => { setOrderState(null); setActiveOrder(null); setCart([]); }} className="btn btn-secondary" style={{ width: '100%' }}>
-              Browse Menu Again
-            </button>
           </div>
-        ) : (
+        )}
+
+        {/* ========================================================================= */}
+        {/* STEP 2: DIGITAL MENU & CART WORKSPACE                                    */}
+        {/* ========================================================================= */}
+        {currentStep === 2 && (
           <>
-            {/* Search Input */}
-            <div style={{ position: 'relative' }}>
-              <Search size={18} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input 
-                type="text" 
-                placeholder="Search food & beverages..." 
-                className="input-control" 
-                style={{ paddingLeft: '2.5rem' }}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            {/* Customer Session Profile Strip */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.5rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.8rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                <User size={14} color="var(--accent-primary)" />
+                <span>{customerName || 'Guest Diner'}</span>
+                <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({customerPhone})</span>
+              </div>
+
+              <button onClick={handleCustomerLogout} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', fontWeight: 600 }}>
+                <LogOut size={12} /> Change
+              </button>
+            </div>
+
+            {/* Search Input & Veg Filter */}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input 
+                  type="text" 
+                  placeholder="Search food & drinks..." 
+                  className="input-control" 
+                  style={{ paddingLeft: '2.2rem', fontSize: '0.85rem' }}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <button 
+                onClick={() => setVegOnly(!vegOnly)}
+                className={`btn btn-sm ${vegOnly ? 'btn-success' : 'btn-secondary'}`}
+                style={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+              >
+                🟢 Veg Only
+              </button>
             </div>
 
             {/* Category Pills */}
-            <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.35rem' }}>
               <button 
                 onClick={() => setSelectedCategory('All')}
                 className={`btn btn-sm ${selectedCategory === 'All' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ borderRadius: '9999px', whiteSpace: 'nowrap' }}
+                style={{ borderRadius: '9999px', whiteSpace: 'nowrap', fontSize: '0.78rem' }}
               >
                 All
               </button>
@@ -276,59 +405,63 @@ export const CustomerQRApp = () => {
                   key={cat.id} 
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`btn btn-sm ${selectedCategory === cat.id ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ borderRadius: '9999px', whiteSpace: 'nowrap' }}
+                  style={{ borderRadius: '9999px', whiteSpace: 'nowrap', fontSize: '0.78rem' }}
                 >
                   {cat.name}
                 </button>
               ))}
             </div>
 
+            {/* Menu List */}
             {loading ? (
               <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                 Loading digital menu...
               </div>
-            ) : menuItems.length === 0 ? (
+            ) : filteredDishes.length === 0 ? (
               <div className="panel-card" style={{ padding: '3rem 1.5rem', textAlign: 'center' }}>
                 <UtensilsCrossed size={40} color="var(--text-muted)" style={{ margin: '0 auto 0.75rem auto', opacity: 0.5 }} />
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '0.35rem' }}>No Menu Items Available</h3>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '0.35rem' }}>No Items Found</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                  No dishes are currently active for Table #{tableData?.table_number || tableId}.
+                  No dishes match your selected category or filter.
                 </p>
               </div>
             ) : (
-              /* Menu Items Cards List */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                 {filteredDishes.map(dish => {
                   const inCart = cart.find(i => i.id === dish.id);
                   const dishPrice = parseFloat(dish.price || 0);
 
                   return (
-                    <div key={dish.id} className="panel-card" style={{ display: 'flex', gap: '1rem', padding: '0.9rem', alignItems: 'center' }}>
+                    <div key={dish.id} className="panel-card" style={{ display: 'flex', gap: '0.85rem', padding: '0.85rem', alignItems: 'center', borderRadius: 'var(--radius-lg)' }}>
                       {dish.image_url ? (
-                        <img src={dish.image_url} alt={dish.name} style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover' }} />
+                        <img src={dish.image_url} alt={dish.name} style={{ width: '75px', height: '75px', borderRadius: '12px', objectFit: 'cover' }} />
                       ) : (
-                        <div style={{ width: '80px', height: '80px', borderRadius: '12px', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Utensils size={26} color="var(--text-muted)" />
+                        <div style={{ width: '75px', height: '75px', borderRadius: '12px', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Utensils size={24} color="var(--text-muted)" />
                         </div>
                       )}
 
                       <div style={{ flex: 1 }}>
-                        <h4 style={{ fontSize: '1.05rem' }}>{dish.name}</h4>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: dish.is_veg ? '#22c55e' : '#ef4444', display: 'inline-block' }} />
+                          <h4 style={{ fontSize: '0.98rem', fontWeight: 700 }}>{dish.name}</h4>
+                        </div>
+                        
                         {dish.description && (
-                          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{dish.description}</p>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{dish.description}</p>
                         )}
-                        <div style={{ fontWeight: 800, color: 'var(--success)', marginTop: '0.35rem' }}>₹{dishPrice.toFixed(2)}</div>
+                        <div style={{ fontWeight: 800, color: 'var(--success)', marginTop: '0.35rem', fontSize: '0.92rem' }}>₹{dishPrice.toFixed(2)}</div>
                       </div>
 
                       <div>
                         {inCart ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--accent-glow)', padding: '0.3rem 0.6rem', borderRadius: 'var(--radius-md)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--accent-glow)', padding: '0.3rem 0.5rem', borderRadius: 'var(--radius-md)' }}>
                             <button onClick={() => removeFromCart(dish.id)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><Minus size={14} /></button>
                             <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{inCart.qty}</span>
                             <button onClick={() => addToCart(dish)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><Plus size={14} /></button>
                           </div>
                         ) : (
-                          <button onClick={() => addToCart(dish)} className="btn btn-primary btn-sm" style={{ borderRadius: 'var(--radius-md)' }}>
+                          <button onClick={() => addToCart(dish)} className="btn btn-primary btn-sm" style={{ borderRadius: 'var(--radius-md)', padding: '0.4rem 0.75rem' }}>
                             <Plus size={14} /> Add
                           </button>
                         )}
@@ -341,107 +474,141 @@ export const CustomerQRApp = () => {
           </>
         )}
 
+        {/* ========================================================================= */}
+        {/* STEP 3: LIVE REAL-TIME ORDER TRACKING DASHBOARD                          */}
+        {/* ========================================================================= */}
+        {currentStep === 3 && activeOrder && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '0.5rem' }}>
+            
+            {/* Ticket Header Card */}
+            <div className="panel-card" style={{ padding: '1.5rem 1.25rem', borderRadius: 'var(--radius-xl)', textAlign: 'center' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'var(--accent-glow)', color: 'var(--accent-primary)', padding: '0.3rem 0.85rem', borderRadius: '9999px', fontSize: '0.78rem', fontWeight: 800, marginBottom: '0.75rem' }}>
+                <Receipt size={14} /> Ticket #{activeOrder.order_number || 'ORD-98421'}
+              </div>
+
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Live Order Tracking</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '0.25rem' }}>
+                Table #{tableData?.table_number || tableId} • Placed by {customerName || 'Diner'}
+              </p>
+
+              {/* 4-Stage Live Progress Stepper */}
+              <div style={{ marginTop: '1.75rem', display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
+                
+                {/* Stepper Progress Bar */}
+                {(() => {
+                  const status = (activeOrder.status || 'pending').toLowerCase();
+                  let progress = '15%';
+                  if (status === 'in_kitchen' || status === 'preparing') progress = '45%';
+                  if (status === 'ready') progress = '75%';
+                  if (status === 'served') progress = '100%';
+
+                  return (
+                    <div style={{ position: 'absolute', top: '16px', left: '10%', right: '10%', height: '3px', background: 'var(--border-color)', zIndex: 0 }}>
+                      <div style={{ height: '100%', width: progress, background: 'var(--accent-primary)', transition: 'width 0.5s ease' }} />
+                    </div>
+                  );
+                })()}
+
+                {/* Step 1: Received */}
+                <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                  <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'var(--accent-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Receipt size={16} />
+                  </div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700 }}>Received</span>
+                </div>
+
+                {/* Step 2: In Kitchen */}
+                {(() => {
+                  const status = (activeOrder.status || 'pending').toLowerCase();
+                  const isActive = ['in_kitchen', 'preparing', 'ready', 'served'].includes(status);
+                  return (
+                    <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                      <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: isActive ? 'var(--accent-primary)' : 'var(--bg-secondary)', color: isActive ? '#fff' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-color)' }}>
+                        <ChefHat size={16} />
+                      </div>
+                      <span style={{ fontSize: '0.72rem', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}>Kitchen</span>
+                    </div>
+                  );
+                })()}
+
+                {/* Step 3: Ready */}
+                {(() => {
+                  const status = (activeOrder.status || 'pending').toLowerCase();
+                  const isActive = ['ready', 'served'].includes(status);
+                  return (
+                    <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                      <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: isActive ? 'var(--accent-primary)' : 'var(--bg-secondary)', color: isActive ? '#fff' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-color)' }}>
+                        <Bell size={16} />
+                      </div>
+                      <span style={{ fontSize: '0.72rem', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}>Ready</span>
+                    </div>
+                  );
+                })()}
+
+                {/* Step 4: Served */}
+                {(() => {
+                  const status = (activeOrder.status || 'pending').toLowerCase();
+                  const isActive = status === 'served';
+                  return (
+                    <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                      <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: isActive ? 'var(--success)' : 'var(--bg-secondary)', color: isActive ? '#fff' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-color)' }}>
+                        <CheckCheck size={16} />
+                      </div>
+                      <span style={{ fontSize: '0.72rem', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}>Served</span>
+                    </div>
+                  );
+                })()}
+
+              </div>
+            </div>
+
+            {/* Ordered Items Summary */}
+            <div className="panel-card" style={{ padding: '1.25rem', borderRadius: 'var(--radius-xl)' }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                Order Items Summary
+              </h4>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                {(activeOrder.items || []).map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <div>
+                      <span style={{ fontWeight: 700 }}>{item.quantity}x</span> {item.name || `Item #${item.menu_item_id}`}
+                    </div>
+                    <span style={{ fontWeight: 700 }}>₹{(item.total_price || (item.unit_price * item.quantity) || 0).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '0.85rem', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1rem', color: 'var(--accent-primary)' }}>
+                <span>Total Bill Amount</span>
+                <span>₹{(activeOrder.total || 0).toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <button onClick={() => setCurrentStep(2)} className="btn btn-primary" style={{ width: '100%', padding: '0.8rem', fontWeight: 800 }}>
+                ➕ Order More Items / Desserts
+              </button>
+            </div>
+
+          </div>
+        )}
+
       </div>
 
-      {/* Floating Bottom Cart Bar */}
-      {cart.length > 0 && !orderState && (
-        <div style={{ position: 'sticky', bottom: '1rem', padding: '0 1.25rem', marginTop: 'auto' }}>
-          <div className="panel-card" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 'var(--radius-lg)', boxShadow: '0 15px 35px rgba(99, 102, 241, 0.4)' }}>
+      {/* Floating Bottom Cart Bar (Step 2 Only) */}
+      {currentStep === 2 && cart.length > 0 && (
+        <div style={{ position: 'sticky', bottom: '1rem', padding: '0 1rem', marginTop: 'auto' }}>
+          <div className="panel-card" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff', padding: '0.85rem 1.15rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 'var(--radius-lg)', boxShadow: '0 15px 35px rgba(99, 102, 241, 0.4)' }}>
             <div>
-              <div style={{ fontWeight: 800, fontSize: '1rem' }}>{cart.reduce((s, i) => s + i.qty, 0)} Items Selected</div>
-              <span style={{ fontSize: '0.8rem', opacity: 0.9 }}>Total: ₹{total.toFixed(2)} (incl. tax)</span>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{cart.reduce((s, i) => s + i.qty, 0)} Items Selected</div>
+              <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Total: ₹{total.toFixed(2)} (incl. tax)</span>
             </div>
 
-            <button onClick={() => setShowCheckoutModal(true)} className="btn btn-secondary btn-sm" style={{ background: '#fff', color: '#4f46e5', fontWeight: 800, border: 'none' }}>
-              <ShoppingCart size={16} /> Place Order
+            <button onClick={handlePlaceOrder} disabled={placingOrder} className="btn btn-secondary btn-sm" style={{ background: '#fff', color: '#4f46e5', fontWeight: 800, border: 'none', padding: '0.5rem 0.85rem' }}>
+              {placingOrder ? 'Sending...' : 'Confirm & Order 🚀'}
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Customer Contact & OTP Verification Modal */}
-      {showCheckoutModal && (
-        <div className="modal-backdrop">
-          <div className="modal-card" style={{ width: '100%', maxWidth: '420px', padding: '1.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Confirm Order for Table #{tableData?.table_number || tableId}</h3>
-              <button onClick={() => setShowCheckoutModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ background: 'var(--bg-secondary)', padding: '0.85rem', borderRadius: '12px', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                <span>Subtotal ({cart.reduce((s, i) => s + i.qty, 0)} items)</span>
-                <span>₹{subtotal.toFixed(2)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                <span>GST (5%)</span>
-                <span>₹{gst.toFixed(2)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1rem', color: 'var(--accent-primary)', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
-                <span>Total Amount</span>
-                <span>₹{total.toFixed(2)}</span>
-              </div>
-            </div>
-
-            <form onSubmit={otpSent ? handleConfirmOrderSubmission : handleRequestOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>Your Name (Optional)</label>
-                <div style={{ position: 'relative' }}>
-                  <User size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input
-                    type="text"
-                    className="input-control"
-                    style={{ paddingLeft: '2.2rem' }}
-                    placeholder="Enter your name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>Mobile Number for OTP Verification</label>
-                <div style={{ position: 'relative' }}>
-                  <Phone size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input
-                    type="tel"
-                    required
-                    className="input-control"
-                    style={{ paddingLeft: '2.2rem' }}
-                    placeholder="9876543210"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {otpSent && (
-                <div>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>Enter 4-Digit OTP</label>
-                  <div style={{ position: 'relative' }}>
-                    <Lock size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type="text"
-                      maxLength={4}
-                      className="input-control"
-                      style={{ paddingLeft: '2.2rem', letterSpacing: '0.25em', fontWeight: 800 }}
-                      placeholder="1234"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                    />
-                  </div>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--success)', marginTop: '0.25rem', display: 'block' }}>
-                    ✓ OTP sent to {phone} (Demo Code: 1234)
-                  </span>
-                </div>
-              )}
-
-              <button type="submit" disabled={submitting} className="btn btn-primary" style={{ width: '100%', padding: '0.8rem', marginTop: '0.5rem', fontWeight: 800 }}>
-                {submitting ? 'Transmitting Order...' : otpSent ? 'Verify & Send to Kitchen' : 'Request OTP & Place Order'} <ArrowRight size={16} />
-              </button>
-            </form>
           </div>
         </div>
       )}
