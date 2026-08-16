@@ -381,10 +381,10 @@ export const MenuManagement = () => {
           ) : (
             visibleCategories.map(c => (
               <span key={c.id} className="badge badge-role" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                📁 {c.name}
+                📁 {c.name} <span style={{ opacity: 0.75, fontSize: '0.72rem', background: 'rgba(255, 255, 255, 0.15)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>ID: {c.id}</span>
                 <button
                   onClick={() => handleDeleteCategory(c.id, c.name)}
-                  style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '0.2rem' }}
                   title="Delete Category"
                 >
                   <Trash2 size={12} />
@@ -523,7 +523,7 @@ export const MenuManagement = () => {
                       <option value="">No categories available</option>
                     ) : (
                       visibleCategories.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
+                        <option key={c.id} value={c.id}>{c.name} (ID: {c.id})</option>
                       ))
                     )}
                   </select>
@@ -577,7 +577,7 @@ export const MenuManagement = () => {
                     onChange={(e) => setEditForm({ ...editForm, category_id: e.target.value })}
                   >
                     {visibleCategories.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>{c.name} (ID: {c.id})</option>
                     ))}
                   </select>
                 </div>
@@ -656,6 +656,36 @@ export const MenuManagement = () => {
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
                 Use our sample template to format dish names, category IDs, prices, and descriptions correctly before uploading.
               </p>
+
+              {/* Category ID Reference Cheat-Sheet */}
+              <div style={{ 
+                background: 'rgba(99, 102, 241, 0.1)', 
+                border: '1px solid rgba(99, 102, 241, 0.25)', 
+                borderRadius: '6px', 
+                padding: '0.65rem 0.75rem', 
+                marginBottom: '0.85rem' 
+              }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '0.4rem' }}>
+                  📋 Your Category IDs Reference (Use these IDs in your CSV file):
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {visibleCategories.length === 0 ? (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No categories created yet.</span>
+                  ) : (
+                    visibleCategories.map(c => (
+                      <span key={c.id} style={{ 
+                        fontSize: '0.75rem', 
+                        background: 'var(--bg-primary, rgba(0,0,0,0.3))', 
+                        padding: '0.2rem 0.5rem', 
+                        borderRadius: '4px', 
+                        border: '1px solid rgba(255,255,255,0.08)' 
+                      }}>
+                        <strong>{c.name}</strong> → <code>ID: {c.id}</code>
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <button
                   type="button"
