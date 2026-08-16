@@ -281,9 +281,7 @@ export const MenuManagement = () => {
 
     try {
       const restId = selectedRestaurant.id;
-      const res = await api.post(`/restaurants/${restId}/menu-items/import`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await api.post(`/restaurants/${restId}/menu-items/import`, formData);
       const jobId = res.data.job_id;
       addToast('info', 'Import Started', 'Processing your bulk menu items file...');
       pollImportStatus(jobId);

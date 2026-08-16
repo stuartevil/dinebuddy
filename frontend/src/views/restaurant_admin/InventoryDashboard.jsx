@@ -230,9 +230,7 @@ export const InventoryDashboard = () => {
 
     try {
       const restId = selectedRestaurant.id;
-      const res = await api.post(`/restaurants/${restId}/inventory/import`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await api.post(`/restaurants/${restId}/inventory/import`, formData);
       const jobId = res.data.job_id;
       addToast('info', 'Import Started', 'Processing your bulk inventory file...');
       pollImportStatus(jobId);

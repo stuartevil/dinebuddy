@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     
     # CORS - can be comma-separated string or list
-    CORS_ORIGINS: Union[List[str], str] = "http://localhost:3000,http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:3000"
+    CORS_ORIGINS: Union[List[str], str] = "http://localhost:3000,http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:3000,https://dinebuddy.vercel.app"
     
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
