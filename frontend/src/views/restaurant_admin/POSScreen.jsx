@@ -342,15 +342,18 @@ export const POSScreen = () => {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '1.25rem', alignItems: 'start' }} className="pos-main-workspace">
       <style>{`
-        @media (max-width: 1280px) {
-          .pos-items-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        .pos-items-grid {
+          grid-template-columns: repeat(4, 1fr) !important;
         }
         @media (max-width: 992px) {
           .pos-main-workspace { grid-template-columns: 1fr !important; }
-          .pos-items-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .pos-items-grid { grid-template-columns: repeat(3, 1fr) !important; }
           .pos-order-desk { position: static !important; width: 100% !important; }
         }
-        @media (max-width: 550px) {
+        @media (max-width: 640px) {
+          .pos-items-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        @media (max-width: 420px) {
           .pos-items-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
