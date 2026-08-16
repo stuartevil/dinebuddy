@@ -61,7 +61,7 @@ def import_menu_items(
 
     # ---------- CSV ----------
     if filename.endswith(".csv"):
-        content = file.file.read().decode("utf-8")
+        content = file.file.read().decode("utf-8-sig", errors="replace")
         csv.DictReader(StringIO(content))  # validate CSV
 
         background_tasks.add_task(
@@ -74,7 +74,7 @@ def import_menu_items(
 
     # ---------- JSON ----------
     elif filename.endswith(".json"):
-        content = file.file.read().decode("utf-8")
+        content = file.file.read().decode("utf-8-sig", errors="replace")
         items = json.loads(content)
         if not isinstance(items, list):
             raise HTTPException(400, "JSON must be an array")

@@ -12,6 +12,17 @@ from app.models.menu_items import MenuItem
 from app.models.bulk_import_items import MenuItemImportJob
 
 
+from app.models.menu_category import MenuCategory
+
+
+def _parse_bool(val: Any, default: bool = True) -> bool:
+    if val is None or val == "":
+        return default
+    if isinstance(val, bool):
+        return val
+    return str(val).strip().lower() in ("true", "1", "t", "yes")
+
+
 # ------------------------------------------------
 # CREATE IMPORT JOB
 # ------------------------------------------------
@@ -47,23 +58,66 @@ def process_rows(
     job.total_records = len(rows)
     db.commit()
 
+    # Pre-fetch existing categories for restaurant
+    categories = db.query(MenuCategory).filter(
+        (MenuCategory.restaurant_id == restaurant_id) | (MenuCategory.is_global == True)
+    ).all()
+    cat_by_id = {c.id: c.id for c in categories}
+    cat_by_name = {c.name.strip().lower(): c.id for c in categories}
+
+    # Ensure at least one category exists
+    fallback_cat_id = categories[0].id if categories else None
+    if not fallback_cat_id:
+        new_cat = MenuCategory(
+            restaurant_id=restaurant_id,
+            name="General",
+            description="Default category for imported items",
+            display_order=1,
+            is_active=True,
+            is_global=False,
+        )
+        db.add(new_cat)
+        db.commit()
+        db.refresh(new_cat)
+        fallback_cat_id = new_cat.id
+        cat_by_id[fallback_cat_id] = fallback_cat_id
+        cat_by_name["general"] = fallback_cat_id
+
     success = 0
     failed = 0
     errors: list[dict] = []
 
     for index, row in enumerate(rows, start=1):
         try:
+            # Category resolution logic: ID match -> Name match -> Fallback category
+            resolved_cat_id = None
+            if "category_id" in row and row["category_id"] is not None and str(row["category_id"]).strip() != "":
+                try:
+                    raw_id = int(row["category_id"])
+                    if raw_id in cat_by_id:
+                        resolved_cat_id = raw_id
+                except ValueError:
+                    pass
+
+            if not resolved_cat_id:
+                cat_name = str(row.get("category") or row.get("category_name") or "").strip().lower()
+                if cat_name in cat_by_name:
+                    resolved_cat_id = cat_by_name[cat_name]
+
+            if not resolved_cat_id:
+                resolved_cat_id = fallback_cat_id
+
             item = MenuItem(
                 restaurant_id=restaurant_id,
-                name=row["name"],
-                category_id=int(row["category_id"]),
+                name=str(row["name"]).strip(),
+                category_id=resolved_cat_id,
                 price=float(row["price"]),
                 description=row.get("description"),
-                is_available=bool(row.get("is_available", True)),
-                is_vegetarian=bool(row.get("is_vegetarian", False)),
+                is_available=_parse_bool(row.get("is_available"), True),
+                is_vegetarian=_parse_bool(row.get("is_vegetarian"), False),
                 preparation_time_minutes=(
                     int(row["preparation_time_minutes"])
-                    if row.get("preparation_time_minutes")
+                    if row.get("preparation_time_minutes") not in (None, "")
                     else None
                 ),
             )
@@ -83,7 +137,7 @@ def process_rows(
     job.success_count = success
     job.failed_count = failed
     job.errors = errors
-    job.status = "COMPLETED" if failed == 0 else "FAILED"
+    job.status = "COMPLETED" if failed == 0 else ("COMPLETED" if success > 0 else "FAILED")
     db.commit()
 
 
