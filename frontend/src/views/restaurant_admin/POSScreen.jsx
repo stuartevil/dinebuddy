@@ -340,7 +340,20 @@ export const POSScreen = () => {
   });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '1.5rem', minHeight: 'calc(100vh - 140px)' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '1.25rem', alignItems: 'start' }} className="pos-main-workspace">
+      <style>{`
+        @media (max-width: 1280px) {
+          .pos-items-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
+        @media (max-width: 992px) {
+          .pos-main-workspace { grid-template-columns: 1fr !important; }
+          .pos-items-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .pos-order-desk { position: static !important; width: 100% !important; }
+        }
+        @media (max-width: 550px) {
+          .pos-items-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
 
       {/* Left Column: Menu Item Browser */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -402,51 +415,53 @@ export const POSScreen = () => {
             No dishes match your search or selected category filter.
           </div>
         ) : (
-          /* Menu Items Grid */
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-            {filteredDishes.map(dish => {
-              const itemPrice = parseFloat(dish.price) || 0;
-              return (
-                <div
-                  key={dish.id}
-                  onClick={() => handleItemClick(dish)}
-                  className="panel-card"
-                  style={{ padding: '1rem', cursor: 'pointer', borderLeft: dish.is_available ? '3px solid var(--success)' : '3px solid var(--danger)' }}
-                >
-                  <div style={{
-                    width: '100%',
-                    height: '100px',
-                    borderRadius: 'var(--radius-md)',
-                    overflow: 'hidden',
-                    background: 'var(--bg-secondary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: '0.75rem',
-                  }}>
-                    {dish.image_url ? (
-                      <img src={dish.image_url} alt={dish.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <ImageIcon size={32} color="var(--text-muted)" />
-                    )}
+          /* Menu Items Scrollable Container & Strictly 4-Columns Grid */
+          <div style={{ maxHeight: 'calc(100vh - 240px)', overflowY: 'auto', paddingRight: '0.4rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem' }} className="pos-items-grid">
+              {filteredDishes.map(dish => {
+                const itemPrice = parseFloat(dish.price) || 0;
+                return (
+                  <div
+                    key={dish.id}
+                    onClick={() => handleItemClick(dish)}
+                    className="panel-card"
+                    style={{ padding: '0.85rem', cursor: 'pointer', borderLeft: dish.is_available ? '3px solid var(--success)' : '3px solid var(--danger)' }}
+                  >
+                    <div style={{
+                      width: '100%',
+                      height: '90px',
+                      borderRadius: 'var(--radius-md)',
+                      overflow: 'hidden',
+                      background: 'var(--bg-secondary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '0.6rem',
+                    }}>
+                      {dish.image_url ? (
+                        <img src={dish.image_url} alt={dish.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <ImageIcon size={28} color="var(--text-muted)" />
+                      )}
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{dish.name}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem' }}>
+                      <span style={{ fontWeight: 800, color: 'var(--success)', fontSize: '0.85rem' }}>₹{itemPrice.toFixed(2)}</span>
+                      <button className="btn btn-primary btn-sm" style={{ padding: '0.15rem 0.5rem', fontSize: '0.75rem' }}>
+                        <Plus size={12} /> Add
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{dish.name}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem' }}>
-                    <span style={{ fontWeight: 800, color: 'var(--success)' }}>₹{itemPrice.toFixed(2)}</span>
-                    <button className="btn btn-primary btn-sm" style={{ padding: '0.2rem 0.6rem' }}>
-                      <Plus size={14} /> Add
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
 
       </div>
 
       {/* Right Column: Current Order & Checkout Desk */}
-      <div className="panel-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div className="panel-card pos-order-desk" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', height: 'fit-content', position: 'sticky', top: '1rem' }}>
 
         {/* Order Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1rem' }}>
@@ -471,7 +486,7 @@ export const POSScreen = () => {
         </div>
 
         {/* Cart Item List */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem' }}>
+        <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingRight: '0.25rem' }}>
           {cart.length === 0 ? (
             <div style={{ padding: '3rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
               Cart is empty. Click on menu items to add to order.
