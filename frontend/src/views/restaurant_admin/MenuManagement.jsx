@@ -1,24 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
-import { UtensilsCrossed, Plus, Trash2, Layers, Search, Upload, FileText, Download, CheckCircle, RefreshCw, X, Edit3 } from 'lucide-react';
+import { UtensilsCrossed, Plus, Trash2, Layers, Search, Upload, FileText, Download, CheckCircle, RefreshCw, X, Edit3, Sliders } from 'lucide-react';
 
 export const MenuManagement = () => {
   const { addToast, selectedRestaurant, requestConfirm } = useAuth();
 
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
+  const [addonGroups, setAddonGroups] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showAddonModal, setShowAddonModal] = useState(false);
   
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', category_id: '', price: '150.0', description: '', is_available: true });
+
+  // Add-on groups management state
+  const [newGroup, setNewGroup] = useState({ name: '', min_selectable: 0, max_selectable: 10 });
+  const [newOptionGroup, setNewOptionGroup] = useState({});
 
   // Bulk import state
   const [importFile, setImportFile] = useState(null);
@@ -28,7 +34,7 @@ export const MenuManagement = () => {
   const [form, setForm] = useState({ name: '', category_id: '', price: '150.0', description: '' });
   const [newCatName, setNewCatName] = useState('');
 
-  // Fetch categories and items from backend
+  // Fetch categories, items, and addon groups from backend
   const fetchMenuData = () => {
     if (!selectedRestaurant) {
       setLoading(false);
@@ -40,11 +46,14 @@ export const MenuManagement = () => {
     Promise.all([
       api.get(`/restaurants/${restId}/menu-categories/`).catch(() => ({ data: [] })),
       api.get(`/restaurants/${restId}/menu-items/`).catch(() => ({ data: [] })),
-    ]).then(([catRes, itemsRes]) => {
+      api.get(`/restaurants/${restId}/addon-groups`).catch(() => ({ data: [] })),
+    ]).then(([catRes, itemsRes, addonRes]) => {
       const catList = Array.isArray(catRes.data) ? catRes.data : catRes.data?.data || [];
       const itemList = Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data?.data || [];
+      const addonList = Array.isArray(addonRes.data) ? addonRes.data : addonRes.data?.data || [];
       setCategories(catList);
       setItems(itemList);
+      setAddonGroups(addonList);
       if (catList.length > 0 && !form.category_id) {
         setForm(f => ({ ...f, category_id: catList[0].id }));
       }
@@ -56,6 +65,64 @@ export const MenuManagement = () => {
   useEffect(() => {
     fetchMenuData();
   }, [selectedRestaurant]);
+
+  // Addon Handlers
+  const handleCreateAddonGroup = async (e) => {
+    e.preventDefault();
+    if (!newGroup.name.trim() || !selectedRestaurant) return;
+    try {
+      const res = await api.post(`/restaurants/${selectedRestaurant.id}/addon-groups`, {
+        name: newGroup.name.trim(),
+        min_selectable: Number(newGroup.min_selectable),
+        max_selectable: Number(newGroup.max_selectable),
+        is_active: true
+      });
+      setAddonGroups(prev => [...prev, res.data]);
+      setNewGroup({ name: '', min_selectable: 0, max_selectable: 10 });
+      addToast('success', 'Group Created', `Add-on Group "${res.data.name}" created!`);
+    } catch (err) {
+      addToast('error', 'Creation Failed', 'Could not create add-on group.');
+    }
+  };
+
+  const handleAddOption = async (groupId) => {
+    const opt = newOptionGroup[groupId];
+    if (!opt || !opt.name || !opt.name.trim() || !selectedRestaurant) return;
+    try {
+      const res = await api.post(`/restaurants/${selectedRestaurant.id}/addon-groups/${groupId}/options`, {
+        name: opt.name.trim(),
+        price: parseFloat(opt.price) || 0,
+        is_available: true
+      });
+      setAddonGroups(prev => prev.map(g => g.id === groupId ? { ...g, options: [...(g.options || []), res.data] } : g));
+      setNewOptionGroup(prev => ({ ...prev, [groupId]: { name: '', price: '' } }));
+      addToast('success', 'Option Added', `"${res.data.name}" added to group!`);
+    } catch (err) {
+      addToast('error', 'Option Failed', 'Could not add option.');
+    }
+  };
+
+  const handleDeleteAddonGroup = async (groupId, groupName) => {
+    if (!selectedRestaurant) return;
+    try {
+      await api.delete(`/restaurants/${selectedRestaurant.id}/addon-groups/${groupId}`);
+      setAddonGroups(prev => prev.filter(g => g.id !== groupId));
+      addToast('success', 'Group Removed', `Group "${groupName}" deleted.`);
+    } catch (err) {
+      addToast('error', 'Delete Failed', 'Could not delete group.');
+    }
+  };
+
+  const handleDeleteOption = async (groupId, optionId) => {
+    if (!selectedRestaurant) return;
+    try {
+      await api.delete(`/restaurants/${selectedRestaurant.id}/addon-groups/options/${optionId}`);
+      setAddonGroups(prev => prev.map(g => g.id === groupId ? { ...g, options: (g.options || []).filter(o => o.id !== optionId) } : g));
+      addToast('success', 'Option Removed', 'Option deleted.');
+    } catch (err) {
+      addToast('error', 'Delete Failed', 'Could not delete option.');
+    }
+  };
 
   // Create Category (with robust fallback & instant state update)
   const handleAddCategory = async (e) => {
@@ -352,6 +419,9 @@ export const MenuManagement = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button onClick={() => setShowAddonModal(true)} className="btn btn-secondary">
+              <Sliders size={16} /> Manage Add-ons ({addonGroups.length})
+            </button>
             <button onClick={() => { setShowImportModal(true); setImportJob(null); setImportFile(null); }} className="btn btn-secondary">
               <Upload size={16} /> Bulk Import Menu
             </button>
@@ -797,6 +867,153 @@ export const MenuManagement = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 5: Manage Add-ons & Modifiers Groups */}
+      {showAddonModal && (
+        <div className="modal-backdrop">
+          <div className="modal-box" style={{ maxWidth: '650px', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
+                <Sliders size={20} color="var(--accent-primary)" /> Manage Add-ons & Modifiers Groups
+              </h3>
+              <button
+                onClick={() => setShowAddonModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Create New Add-on Group Form */}
+            <form onSubmit={handleCreateAddonGroup} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', marginBottom: '1.25rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                ➕ Create New Add-on Group (e.g. Extra Toppings, Choose Milk)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Group Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Extra Toppings"
+                    className="input-control"
+                    value={newGroup.name}
+                    onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Min Selection</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="input-control"
+                    value={newGroup.min_selectable}
+                    onChange={(e) => setNewGroup({ ...newGroup, min_selectable: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Max Selection</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="input-control"
+                    value={newGroup.max_selectable}
+                    onChange={(e) => setNewGroup({ ...newGroup, max_selectable: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="submit" className="btn btn-primary btn-sm">
+                  + Create Group
+                </button>
+              </div>
+            </form>
+
+            {/* List of Existing Add-on Groups */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {addonGroups.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  No Add-on Groups created yet. Create your first group above!
+                </div>
+              ) : (
+                addonGroups.map(group => (
+                  <div key={group.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <div>
+                        <strong style={{ fontSize: '0.95rem', color: 'var(--accent-primary)' }}>{group.name}</strong>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                          (Min: {group.min_selectable}, Max: {group.max_selectable})
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteAddonGroup(group.id, group.name)}
+                        style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                        title="Delete Group"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+
+                    {/* Options inside this Group */}
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                      {(!group.options || group.options.length === 0) ? (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No options in this group yet.</span>
+                      ) : (
+                        group.options.map(opt => (
+                          <span key={opt.id} className="badge badge-role" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                            {opt.name} (+₹{opt.price})
+                            <button
+                              onClick={() => handleDeleteOption(group.id, opt.id)}
+                              style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}
+                            >
+                              <X size={10} />
+                            </button>
+                          </span>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Add New Option to this Group */}
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        placeholder="Option Name (e.g. Extra Cheese)"
+                        className="input-control"
+                        style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
+                        value={newOptionGroup[group.id]?.name || ''}
+                        onChange={(e) => setNewOptionGroup({ ...newOptionGroup, [group.id]: { ...newOptionGroup[group.id], name: e.target.value } })}
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Price ₹"
+                        className="input-control"
+                        style={{ width: '90px', fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
+                        value={newOptionGroup[group.id]?.price || ''}
+                        onChange={(e) => setNewOptionGroup({ ...newOptionGroup, [group.id]: { ...newOptionGroup[group.id], price: e.target.value } })}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddOption(group.id)}
+                        className="btn btn-secondary btn-sm"
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        + Add Option
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
+              <button onClick={() => setShowAddonModal(false)} className="btn btn-primary">
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

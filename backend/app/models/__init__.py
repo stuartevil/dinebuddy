@@ -18,6 +18,7 @@ from .order_item import OrderItem
 from .ingredient import Ingredient
 from .recipe_item import RecipeItem
 from .stock_transaction import StockTransaction, TransactionType
+from .addon import AddonGroup, AddonOption, MenuItemAddonGroupMap
 
 __all__ = [
     "User",
@@ -28,6 +29,9 @@ __all__ = [
     "MenuCategory",
     "MenuItem",
     "MenuItemVariant",
+    "AddonGroup",
+    "AddonOption",
+    "MenuItemAddonGroupMap",
     "RestaurantSettings",
     "MenuItemImportJob",
     "IngredientImportJob",
