@@ -36,30 +36,6 @@ router = APIRouter(
 )
 
 
-# ------------------------------------------------------------------
-# GET MENU ITEM BY ID (PUBLIC)
-# ------------------------------------------------------------------
-@router.get("/{item_id}", response_model=MenuItemRead)
-def get_menu_item(
-    restaurant_id: int,
-    item_id: int,
-    db: Session = Depends(get_db),
-):
-    item = menu_items_service.get_menu_item(
-        db,
-        item_id=item_id,
-        restaurant_id=restaurant_id,
-    )
-
-    if not item:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Menu item not found"
-        )
-
-    return item
-
-
 # =================================================
 # IMPORT ROUTES (STATIC)
 # =================================================
@@ -185,6 +161,25 @@ def get_import_job_status(
 # =================================================
 # MENU ITEM CRUD
 # =================================================
+@router.get("/{item_id}", response_model=MenuItemRead)
+def get_menu_item(
+    restaurant_id: int,
+    item_id: int,
+    db: Session = Depends(get_db),
+):
+    item = menu_items_service.get_menu_item(
+        db,
+        item_id=item_id,
+        restaurant_id=restaurant_id,
+    )
+
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Menu item not found"
+        )
+
+    return item
 @router.get("/", response_model=list[MenuItemRead])
 def list_menu_items(
     restaurant_id: int,
