@@ -21,6 +21,7 @@ export const MenuManagement = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', category_id: '', price: '150.0', description: '', is_available: true });
+  const [editAddonGroupIds, setEditAddonGroupIds] = useState([]);
 
   // Add-on groups management state
   const [newGroup, setNewGroup] = useState({ name: '', min_selectable: 0, max_selectable: 10 });
@@ -249,6 +250,15 @@ export const MenuManagement = () => {
       description: item.description || '',
       is_available: item.is_available !== undefined ? item.is_available : true,
     });
+    setEditAddonGroupIds([]);
+    if (selectedRestaurant) {
+      api.get(`/restaurants/${selectedRestaurant.id}/menu-items/${item.id}/addon-groups`)
+        .then(res => {
+          const ids = (res.data || []).map(g => g.id);
+          setEditAddonGroupIds(ids);
+        })
+        .catch(() => setEditAddonGroupIds([]));
+    }
     setShowEditModal(true);
   };
 
@@ -270,6 +280,11 @@ export const MenuManagement = () => {
       if (updated && updated.id) {
         setItems(prev => prev.map(i => i.id === editItem.id ? { ...i, ...updated } : i));
       }
+
+      // Save attached add-on groups
+      await api.post(`/restaurants/${selectedRestaurant.id}/menu-items/${editItem.id}/addon-groups`, {
+        group_ids: editAddonGroupIds
+      }).catch(() => {});
 
       addToast('success', 'Menu Item Updated', `"${editForm.name}" updated successfully!`);
       setShowEditModal(false);
@@ -677,6 +692,37 @@ export const MenuManagement = () => {
                   value={editForm.description} 
                   onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} 
                 />
+              </div>
+
+              {/* Attach Add-on Groups Selection */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.4rem', display: 'block', color: 'var(--accent-primary)' }}>
+                  🔗 Attach Add-on Groups for this Dish:
+                </label>
+                {addonGroups.length === 0 ? (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    No Add-on Groups created yet. Use "Manage Add-ons" on the banner to create groups first.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '120px', overflowY: 'auto' }}>
+                    {addonGroups.map(g => (
+                      <label key={g.id} style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={editAddonGroupIds.includes(g.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditAddonGroupIds(prev => [...prev, g.id]);
+                            } else {
+                              setEditAddonGroupIds(prev => prev.filter(id => id !== g.id));
+                            }
+                          }}
+                        />
+                        <span><strong>{g.name}</strong> <span style={{ opacity: 0.7, fontSize: '0.72rem' }}>({(g.options || []).map(o => o.name).join(', ') || 'No options'})</span></span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
