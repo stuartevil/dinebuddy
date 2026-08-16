@@ -24,10 +24,14 @@ async def lifespan(app: FastAPI):
     os.makedirs(os.path.join(UPLOAD_BASE, "logos"), exist_ok=True)
     print(f"📁 Upload directory ready: {UPLOAD_BASE}")
     
-    # Note: We use Alembic migrations for database schema management
-    # Tables are created by running: alembic upgrade head
-    # (handled automatically in docker-compose.yml startup command)
-    
+    # Ensure database tables exist automatically on startup
+    try:
+        import app.models  # load all models for metadata
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database tables created/verified successfully.")
+    except Exception as e:
+        print(f"⚠️ Table creation warning: {e}")
+
     yield
     
     # Shutdown
