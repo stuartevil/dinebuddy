@@ -287,7 +287,13 @@ export const MenuManagement = () => {
       pollImportStatus(jobId);
     } catch (err) {
       setImportUploading(false);
-      addToast('error', 'Upload Failed', err?.response?.data?.detail || err.message);
+      const detail = err?.response?.data?.detail;
+      const errorMsg = typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map(d => d.msg || JSON.stringify(d)).join(', ')
+          : err?.message || 'Upload failed';
+      addToast('error', 'Upload Failed', errorMsg);
     }
   };
 

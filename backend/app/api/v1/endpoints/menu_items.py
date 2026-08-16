@@ -57,7 +57,7 @@ def import_menu_items(
         check_restaurant_access(restaurant_id, current_user, db)
 
     job = bulk_import_items_service.create_job(db, restaurant_id)
-    filename = file.filename.lower()
+    filename = (file.filename or "").lower()
 
     # ---------- CSV ----------
     if filename.endswith(".csv"):

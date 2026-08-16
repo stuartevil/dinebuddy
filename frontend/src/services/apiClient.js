@@ -9,12 +9,15 @@ const client = axios.create({
   },
 });
 
-// Request interceptor to attach JWT Token
+// Request interceptor to attach JWT Token & handle FormData headers
 client.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('dinebuddy_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
     }
     return config;
   },
