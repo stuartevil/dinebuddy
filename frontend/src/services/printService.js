@@ -226,7 +226,9 @@ export const printBill = (bill, restaurant = {}) => {
   const gstRate = restaurant.tax_rate !== undefined && restaurant.tax_rate !== null ? parseFloat(restaurant.tax_rate) : (bill.tax_rate !== undefined ? parseFloat(bill.tax_rate) : 5);
   const gst = bill.gst !== undefined ? parseFloat(bill.gst) : (bill.tax !== undefined ? parseFloat(bill.tax) : (subtotal * (gstRate / 100)));
   const discount = parseFloat(bill.discount || 0);
-  const total = parseFloat(bill.total || (subtotal + gst - discount) || 0);
+  const rawTotal = Math.max(0, subtotal + gst - discount);
+  const total = bill.total !== undefined ? parseFloat(bill.total) : Math.round(rawTotal);
+  const roundOff = bill.round_off !== undefined ? parseFloat(bill.round_off) : Math.round((total - rawTotal) * 100) / 100;
   const paymentMethod = (bill.payment_method || 'CASH').toUpperCase();
   const paymentStatus = (bill.payment_status || (bill.status && bill.status !== 'cancelled') ? 'PAID' : 'PAID').toUpperCase();
 
@@ -239,10 +241,12 @@ export const printBill = (bill, restaurant = {}) => {
       <tr>
         <td style="padding: 3px 0;">
           <div style="font-weight: bold;">${name}</div>
+          ${item.special_instructions ? `<div style="font-size: 8px; color: #555;">Note: ${item.special_instructions}</div>` : ''}
+          ${item.addonsTitle ? `<div style="font-size: 8px; color: #555;">${item.addonsTitle}</div>` : ''}
         </td>
-        <td style="text-align: center; vertical-align: top;">${qty}</td>
-        <td style="text-align: right; vertical-align: top;">${price.toFixed(2)}</td>
-        <td style="text-align: right; vertical-align: top; font-weight: bold;">${lineTotal.toFixed(2)}</td>
+        <td style="text-align: center; padding: 3px 0;">${qty}</td>
+        <td style="text-align: right; padding: 3px 0;">₹${price.toFixed(2)}</td>
+        <td style="text-align: right; padding: 3px 0;">₹${lineTotal.toFixed(2)}</td>
       </tr>
     `;
   }).join('');
@@ -252,127 +256,130 @@ export const printBill = (bill, restaurant = {}) => {
     <html>
     <head>
       <meta charset="utf-8">
-      <title>Bill - ${billNum}</title>
+      <title>Tax Invoice / Bill - ${billNum}</title>
       <style>
         @page {
+          margin: 0;
           size: 80mm auto;
-          margin: 0mm 0.2in 0mm 0mm;
         }
         body {
-          width: 76mm;
-          margin: 0 auto;
-          padding: 8px 0.2in 8px 4px;
-          padding-right: 0.2in;
-          font-family: 'Courier New', Courier, monospace, sans-serif;
-          font-size: 12px;
+          font-family: 'Courier New', Courier, monospace;
+          font-size: 10px;
+          line-height: 1.3;
           color: #000;
-          line-height: 1.2;
           background: #fff;
+          margin: 0;
+          padding: 8px;
+          width: 72mm;
         }
         .header {
           text-align: center;
-          margin-bottom: 6px;
+          margin-bottom: 8px;
         }
         .restaurant-name {
-          font-size: 16px;
+          font-size: 14px;
           font-weight: 900;
           text-transform: uppercase;
+          letter-spacing: 0.5px;
           margin-bottom: 2px;
         }
-        .contact-info {
-          font-size: 11px;
+        .meta-info {
+          font-size: 9px;
+          margin-bottom: 1px;
         }
-        .divider {
+        .bill-title {
+          font-size: 11px;
+          font-weight: bold;
+          margin: 6px 0 3px 0;
           border-top: 1px dashed #000;
-          margin: 6px 0;
+          border-bottom: 1px dashed #000;
+          padding: 3px 0;
+          text-transform: uppercase;
         }
-        .double-divider {
-          border-top: 2px double #000;
-          margin: 6px 0;
-        }
-        .meta-table {
-          width: 100%;
-          font-size: 11px;
+        .order-info {
+          display: flex;
+          justify-content: space-between;
+          font-size: 9px;
           margin-bottom: 4px;
         }
-        .meta-table td {
-          padding: 1px 0;
+        .divider {
+          border-bottom: 1px dashed #000;
+          margin: 4px 0;
         }
-        .items-table {
+        .double-divider {
+          border-bottom: 2px solid #000;
+          margin: 6px 0;
+        }
+        table {
           width: 100%;
           border-collapse: collapse;
-          margin-bottom: 6px;
+          font-size: 9.5px;
         }
-        .items-table th {
+        th {
           border-bottom: 1px solid #000;
-          font-size: 11px;
-          padding-bottom: 3px;
+          padding: 3px 0;
+          text-align: left;
+          font-weight: bold;
         }
         .totals-table {
           width: 100%;
-          font-size: 12px;
           margin-top: 4px;
         }
         .totals-table td {
           padding: 2px 0;
         }
         .grand-total {
-          font-size: 15px;
+          font-size: 13px;
           font-weight: 900;
         }
         .payment-box {
           border: 1px solid #000;
-          padding: 5px;
+          padding: 4px;
           text-align: center;
-          margin: 8px 0;
+          margin: 6px 0;
           font-weight: bold;
-          font-size: 12px;
+          font-size: 9px;
         }
         .footer {
           text-align: center;
-          font-size: 11px;
-          margin-top: 8px;
+          font-size: 8.5px;
+          margin-top: 6px;
         }
       </style>
     </head>
     <body>
       <div class="header">
         <div class="restaurant-name">${restaurantName}</div>
-        ${address ? `<div class="contact-info">${address}</div>` : ''}
-        ${phone ? `<div class="contact-info">Ph: ${phone}</div>` : ''}
-        ${gstin ? `<div class="contact-info">GSTIN: ${gstin}</div>` : ''}
+        ${address ? `<div class="meta-info">${address}</div>` : ''}
+        ${phone ? `<div class="meta-info">Ph: ${phone}</div>` : ''}
+        ${gstin ? `<div class="meta-info">GSTIN: ${gstin}</div>` : ''}
+        
+        <div class="bill-title">TAX INVOICE / RECEIPT</div>
+      </div>
+
+      <div class="order-info">
+        <div><strong>Bill:</strong> ${billNum}</div>
+        <div><strong>Table:</strong> ${tableNum}</div>
+      </div>
+      <div class="order-info">
+        <div><strong>Date:</strong> ${billTime}</div>
       </div>
 
       <div class="divider"></div>
 
-      <table class="meta-table">
-        <tr>
-          <td><strong>Bill #:</strong> ${billNum}</td>
-          <td style="text-align: right;"><strong>Date:</strong> ${billTime}</td>
-        </tr>
-        <tr>
-          <td><strong>Table:</strong> ${tableNum}</td>
-          <td style="text-align: right;"><strong>Type:</strong> POS Sale</td>
-        </tr>
-      </table>
-
-      <div class="divider"></div>
-
-      <table class="items-table">
+      <table>
         <thead>
           <tr>
-            <th style="text-align: left;">ITEM</th>
-            <th style="text-align: center; width: 30px;">QTY</th>
-            <th style="text-align: right; width: 50px;">RATE</th>
-            <th style="text-align: right; width: 60px;">AMOUNT</th>
+            <th style="width: 45%;">ITEM</th>
+            <th style="text-align: center; width: 15%;">QTY</th>
+            <th style="text-align: right; width: 20%;">RATE</th>
+            <th style="text-align: right; width: 20%;">AMT</th>
           </tr>
         </thead>
         <tbody>
           ${itemsHtml}
         </tbody>
       </table>
-
-      <div class="divider"></div>
 
       <table class="totals-table">
         <tr>
@@ -389,6 +396,12 @@ export const printBill = (bill, restaurant = {}) => {
           <td style="text-align: right;">-₹${discount.toFixed(2)}</td>
         </tr>
         ` : ''}
+        ${Math.abs(roundOff) >= 0.01 ? `
+        <tr>
+          <td>Round Off:</td>
+          <td style="text-align: right;">${roundOff > 0 ? `+₹${roundOff.toFixed(2)}` : `-₹${Math.abs(roundOff).toFixed(2)}`}</td>
+        </tr>
+        ` : ''}
         <tr class="grand-total">
           <td style="border-top: 1px solid #000; padding-top: 4px;">TOTAL DUE:</td>
           <td style="text-align: right; border-top: 1px solid #000; padding-top: 4px;">₹${total.toFixed(2)}</td>
@@ -399,7 +412,6 @@ export const printBill = (bill, restaurant = {}) => {
         PAYMENT MODE: ${paymentMethod} | STATUS: ${paymentStatus}
       </div>
 
-      <div class="double-divider"></div>
 
       <div class="footer">
         <div>Thank you for dining with us!</div>

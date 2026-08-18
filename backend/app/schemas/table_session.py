@@ -54,5 +54,6 @@ class LiveBillSummary(BaseModel):
     subtotal: float
     tax: float
     discount: float
+    round_off: float = 0.0
     total_amount: float
     opened_at: datetime

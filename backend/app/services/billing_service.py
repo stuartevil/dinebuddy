@@ -221,14 +221,16 @@ class BillingService:
         )
 
         subtotal = sum(order.subtotal for order in active_orders)
-        tax = sum(order.tax for order in active_orders)
         subtotal_after_discount = max(0.0, subtotal - session.discount)
         tax_pct = BillingService._get_restaurant_tax_percentage(db, session.restaurant_id)
         tax_calculated = round(subtotal_after_discount * (tax_pct / 100.0), 2)
         
+        raw_total = max(0.0, subtotal_after_discount + tax_calculated)
+        rounded_total = float(round(raw_total))
+        
         session.subtotal = round(subtotal, 2)
         session.tax = tax_calculated
-        session.total_amount = round(subtotal_after_discount + tax_calculated, 2)
+        session.total_amount = rounded_total
 
     @staticmethod
     def get_live_bill_summary(db: Session, table_id: int) -> LiveBillSummary:
@@ -261,16 +263,9 @@ class BillingService:
             for item in order.items:
                 key = (item.menu_item_id, item.variant_id)
                 if key not in items_map:
-                    menu_item = db.query(MenuItem).filter(MenuItem.id == item.menu_item_id).first()
-                    variant_name = None
-                    if item.variant_id:
-                        v = db.query(MenuItemVariant).filter(MenuItemVariant.id == item.variant_id).first()
-                        if v:
-                            variant_name = v.name
                     items_map[key] = {
-                        "menu_item_id": item.menu_item_id,
-                        "item_name": menu_item.name if menu_item else "Unknown Item",
-                        "variant_name": variant_name,
+                        "item_name": item.menu_item.name if item.menu_item else "Unknown Item",
+                        "variant_name": item.variant.name if item.variant else None,
                         "quantity": 0,
                         "unit_price": item.unit_price,
                         "total_price": 0.0
@@ -279,6 +274,8 @@ class BillingService:
                 items_map[key]["total_price"] = round(items_map[key]["total_price"] + item.total_price, 2)
 
         items_summary = [LiveBillItemSummary(**val) for val in items_map.values()]
+        raw_total = max(0.0, session.subtotal - session.discount) + session.tax
+        round_off = round(session.total_amount - raw_total, 2)
 
         return LiveBillSummary(
             session_id=session.id,
@@ -290,6 +287,7 @@ class BillingService:
             subtotal=session.subtotal,
             tax=session.tax,
             discount=session.discount,
+            round_off=round_off,
             total_amount=session.total_amount,
             opened_at=session.opened_at
         )

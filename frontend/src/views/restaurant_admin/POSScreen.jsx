@@ -195,7 +195,9 @@ export const POSScreen = () => {
 
   const discountedSubtotal = Math.max(0, subtotal - discountAmount);
   const gst = discountedSubtotal * (taxRate / 100);
-  const total = Math.max(0, discountedSubtotal + gst);
+  const rawTotal = Math.max(0, discountedSubtotal + gst);
+  const total = Math.round(rawTotal);
+  const roundOff = Math.round((total - rawTotal) * 100) / 100;
 
   const handlePrintCartKOT = () => {
     if (cart.length === 0) return;
@@ -218,6 +220,7 @@ export const POSScreen = () => {
       subtotal,
       gst,
       discount: discountAmount,
+      round_off: roundOff,
       total,
       payment_method: paymentMethod,
       payment_status: 'PAID'
@@ -333,6 +336,7 @@ export const POSScreen = () => {
         subtotal,
         gst,
         discount: discountAmount,
+        round_off: roundOff,
         total,
         payment_method: paymentMethod,
         payment_status: 'PAID'
@@ -567,12 +571,18 @@ export const POSScreen = () => {
         {/* Financial Breakdown & Compact Checkout Controls */}
         <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.65rem', marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
           
-          {/* Summary Row: Subtotal, GST & Expandable Discount Tag */}
+          {/* Summary Row: Subtotal, GST, Round Off & Expandable Discount Tag */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <span>Sub: <strong style={{ color: 'var(--text-primary)' }}>₹{subtotal.toFixed(2)}</strong></span>
               <span>•</span>
               <span>GST ({taxRate}%): <strong style={{ color: 'var(--text-primary)' }}>₹{gst.toFixed(2)}</strong></span>
+              {Math.abs(roundOff) >= 0.01 && (
+                <>
+                  <span>•</span>
+                  <span>R.Off: <strong style={{ color: roundOff > 0 ? 'var(--text-muted)' : 'var(--success)' }}>{roundOff > 0 ? `+₹${roundOff.toFixed(2)}` : `-₹${Math.abs(roundOff).toFixed(2)}`}</strong></span>
+                </>
+              )}
             </div>
 
             {/* Expandable Discount Trigger */}
@@ -713,7 +723,7 @@ export const POSScreen = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.35rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
             <div>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Total Due</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--success)', lineHeight: '1.1' }}>₹{total.toFixed(2)}</div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--success)', lineHeight: '1.1' }}>₹{total.toFixed(2)}</div>
             </div>
 
             {/* Compact Payment Pills */}
