@@ -1,9 +1,9 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { 
   getAuth, 
   RecaptchaVerifier, 
   signInWithPhoneNumber 
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC03a84kt4mC2S609cyVdradzV77_2sX-Y",
@@ -15,7 +15,7 @@ const firebaseConfig = {
   measurementId: "G-M489FM8CSP"
 };
 
-// Initialize Firebase App & Auth
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase App & Auth safely
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export { RecaptchaVerifier, signInWithPhoneNumber };

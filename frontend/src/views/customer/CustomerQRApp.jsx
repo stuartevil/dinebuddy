@@ -105,20 +105,32 @@ export const CustomerQRApp = () => {
 
   // Initialize Firebase Recaptcha Verifier
   const setupRecaptcha = () => {
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible',
-        callback: () => {},
-        'expired-callback': () => {
-          setAuthError('Recaptcha expired. Please try sending OTP again.');
-        }
-      });
+    if (window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier.clear();
+      } catch (e) {
+        console.warn('Recaptcha clear error:', e);
+      }
+      window.recaptchaVerifier = null;
     }
+
+    const container = document.getElementById('recaptcha-container');
+    if (!container) return null;
+
+    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      size: 'invisible',
+      callback: () => {},
+      'expired-callback': () => {
+        setAuthError('reCAPTCHA expired. Please try sending OTP again.');
+      }
+    });
+
+    return window.recaptchaVerifier;
   };
 
   // Step 1: Send Real Firebase SMS OTP (Strict)
   const handleRequestFirebaseOtp = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setAuthError('');
     const cleanPhone = customerPhone.replace(/\D/g, '');
 
@@ -131,23 +143,37 @@ export const CustomerQRApp = () => {
     const formattedPhone = `+91${cleanPhone.slice(-10)}`;
 
     try {
-      setupRecaptcha();
-      const appVerifier = window.recaptchaVerifier;
+      const appVerifier = setupRecaptcha();
+      if (!appVerifier) {
+        setAuthError('reCAPTCHA widget container missing. Please refresh.');
+        return;
+      }
       const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
       setConfirmationResult(result);
       setOtpSent(true);
       setAuthError('');
     } catch (err) {
       console.error('Firebase SMS OTP Error:', err);
+      if (window.recaptchaVerifier) {
+        try { window.recaptchaVerifier.clear(); } catch (e) {}
+        window.recaptchaVerifier = null;
+      }
       setConfirmationResult(null);
       setOtpSent(false);
+
       let errorMsg = err?.message || 'Failed to send SMS OTP.';
-      if (err?.code === 'auth/invalid-phone-number') {
-        errorMsg = 'Invalid phone number format.';
+      if (err?.code === 'auth/billing-not-enabled') {
+        errorMsg = 'Firebase Error (auth/billing-not-enabled): Firebase Spark plan does not allow real SMS. Either add a Test Phone Number (+91 9999999999 / code 123456) in Firebase Console -> Authentication -> Sign-in method -> Phone, or upgrade project to Blaze plan.';
+      } else if (err?.code === 'auth/invalid-phone-number') {
+        errorMsg = 'Invalid mobile number format. Please enter 10 digits.';
+      } else if (err?.code === 'auth/quota-exceeded' || err?.code === 'auth/too-many-requests') {
+        errorMsg = 'Daily SMS quota exceeded. Use a Firebase Test Number (+91 9999999999 with code 123456).';
       } else if (err?.code === 'auth/captcha-check-failed' || err?.code === 'auth/unauthorized-domain') {
-        errorMsg = 'Domain not authorized in Firebase Console -> Authentication -> Settings -> Authorized domains.';
+        errorMsg = `Domain (${window.location.hostname}) not authorized in Firebase Console -> Authentication -> Settings -> Authorized domains.`;
+      } else if (err?.code === 'auth/operation-not-allowed') {
+        errorMsg = 'Phone Authentication is disabled in Firebase Console -> Authentication -> Sign-in method.';
       }
-      setAuthError(`Firebase Error: ${errorMsg}`);
+      setAuthError(errorMsg);
     } finally {
       setIsVerifying(false);
     }
@@ -487,6 +513,32 @@ export const CustomerQRApp = () => {
                 <button type="submit" disabled={isVerifying} className="btn btn-primary" style={{ width: '100%', padding: '0.85rem', marginTop: '0.5rem', fontWeight: 800, fontSize: '0.95rem' }}>
                   {isVerifying ? 'Verifying Phone Credentials...' : otpSent ? 'Verify OTP & Open Menu 📖' : 'Send Firebase SMS OTP 📲'}
                 </button>
+
+                <div style={{ marginTop: '0.5rem', padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-md)', background: 'rgba(99, 102, 241, 0.08)', border: '1px dashed rgba(99, 102, 241, 0.25)', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>
+                    Testing without SMS billing?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerName('Demo Diner');
+                      setCustomerPhone('9999999999');
+                      setOtpCode('123456');
+                      setAuthError('');
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--accent-primary)',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    ⚡ Auto-fill Test Phone (+91 9999999999 / 123456)
+                  </button>
+                </div>
               </form>
             </div>
           </div>
