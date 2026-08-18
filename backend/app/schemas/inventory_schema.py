@@ -17,6 +17,8 @@ from app.schemas.recipe_item_schema import (
     RecipeItemBase,
     RecipeItemCreate,
     RecipeItemRead,
+    RecipeBulkItem,
+    RecipeBulkSaveRequest,
 )
 from app.schemas.stock_transaction_schema import (
     StockTransactionCreate,
@@ -36,6 +38,8 @@ __all__ = [
     "RecipeItemBase",
     "RecipeItemCreate",
     "RecipeItemRead",
+    "RecipeBulkItem",
+    "RecipeBulkSaveRequest",
     "StockTransactionCreate",
     "StockTransactionRead",
     "InventorySummaryRead",

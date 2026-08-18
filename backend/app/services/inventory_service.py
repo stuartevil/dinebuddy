@@ -14,6 +14,7 @@ from app.schemas.inventory_schema import (
     IngredientRead,
     RecipeItemCreate,
     RecipeItemRead,
+    RecipeBulkSaveRequest,
     StockTransactionCreate,
     StockTransactionRead,
     InventorySummaryRead,
@@ -421,20 +422,18 @@ def create_or_update_recipe_item(
     )
 
 
-def get_recipe_for_menu_item(
+def get_all_recipes_for_restaurant(
     db: Session,
     restaurant_id: int,
-    menu_item_id: int,
 ) -> List[RecipeItemRead]:
-    results = db.query(RecipeItem, Ingredient.name, Ingredient.unit).join(
+    results = db.query(RecipeItem, Ingredient.name, Ingredient.unit, Ingredient.cost_per_unit).join(
         Ingredient, RecipeItem.ingredient_id == Ingredient.id
     ).filter(
         RecipeItem.restaurant_id == restaurant_id,
-        RecipeItem.menu_item_id == menu_item_id,
     ).all()
 
     recipe_list = []
-    for item, ing_name, ing_unit in results:
+    for item, ing_name, ing_unit, ing_cost in results:
         recipe_list.append(
             RecipeItemRead(
                 id=item.id,
@@ -443,6 +442,38 @@ def get_recipe_for_menu_item(
                 ingredient_id=item.ingredient_id,
                 ingredient_name=ing_name,
                 ingredient_unit=ing_unit,
+                ingredient_cost_per_unit=Decimal(str(ing_cost or 0)),
+                quantity_used=Decimal(str(item.quantity_used)),
+                created_at=item.created_at,
+                updated_at=item.updated_at,
+            )
+        )
+    return recipe_list
+
+
+def get_recipe_for_menu_item(
+    db: Session,
+    restaurant_id: int,
+    menu_item_id: int,
+) -> List[RecipeItemRead]:
+    results = db.query(RecipeItem, Ingredient.name, Ingredient.unit, Ingredient.cost_per_unit).join(
+        Ingredient, RecipeItem.ingredient_id == Ingredient.id
+    ).filter(
+        RecipeItem.restaurant_id == restaurant_id,
+        RecipeItem.menu_item_id == menu_item_id,
+    ).all()
+
+    recipe_list = []
+    for item, ing_name, ing_unit, ing_cost in results:
+        recipe_list.append(
+            RecipeItemRead(
+                id=item.id,
+                restaurant_id=item.restaurant_id,
+                menu_item_id=item.menu_item_id,
+                ingredient_id=item.ingredient_id,
+                ingredient_name=ing_name,
+                ingredient_unit=ing_unit,
+                ingredient_cost_per_unit=Decimal(str(ing_cost or 0)),
                 quantity_used=Decimal(str(item.quantity_used)),
                 created_at=item.created_at,
                 updated_at=item.updated_at,
@@ -450,6 +481,59 @@ def get_recipe_for_menu_item(
         )
 
     return recipe_list
+
+
+def bulk_save_recipe_for_menu_item(
+    db: Session,
+    restaurant_id: int,
+    menu_item_id: int,
+    data: RecipeBulkSaveRequest,
+) -> List[RecipeItemRead]:
+    # Update MenuItem description & preparation time if provided
+    menu_item = db.query(MenuItem).filter(
+        MenuItem.id == menu_item_id,
+        MenuItem.restaurant_id == restaurant_id,
+    ).first()
+
+    if not menu_item:
+        raise ValueError(f"Menu Item ID {menu_item_id} not found for this restaurant")
+
+    if data.description is not None:
+        menu_item.description = data.description
+    if data.preparation_time_minutes is not None:
+        menu_item.preparation_time_minutes = data.preparation_time_minutes
+
+    # Remove existing recipe items for this dish
+    db.query(RecipeItem).filter(
+        RecipeItem.restaurant_id == restaurant_id,
+        RecipeItem.menu_item_id == menu_item_id,
+    ).delete(synchronize_session=False)
+
+    # Insert new recipe items
+    for it in data.items:
+        new_item = RecipeItem(
+            restaurant_id=restaurant_id,
+            menu_item_id=menu_item_id,
+            ingredient_id=it.ingredient_id,
+            quantity_used=it.quantity_used,
+        )
+        db.add(new_item)
+
+    db.commit()
+    return get_recipe_for_menu_item(db, restaurant_id, menu_item_id)
+
+
+def delete_all_recipe_items_for_menu_item(
+    db: Session,
+    restaurant_id: int,
+    menu_item_id: int,
+) -> bool:
+    count = db.query(RecipeItem).filter(
+        RecipeItem.restaurant_id == restaurant_id,
+        RecipeItem.menu_item_id == menu_item_id,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return count > 0
 
 
 def delete_recipe_item(
