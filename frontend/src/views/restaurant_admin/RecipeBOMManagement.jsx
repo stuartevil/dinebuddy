@@ -56,7 +56,7 @@ export const RecipeBOMManagement = () => {
         api.get(`/restaurants/${restId}/menu-items/`).catch(() => ({ data: [] })),
         api.get(`/restaurants/${restId}/menu-categories/`).catch(() => ({ data: [] })),
         api.get(`/restaurants/${restId}/inventory/ingredients`).catch(() => ({ data: [] })),
-        api.get(`/restaurants/${restId}/inventory/recipes`).catch(() => ({ data: [] })),
+        api.get(`/restaurants/${restId}/recipes`).catch(() => ({ data: [] })),
       ]);
 
       const itemsList = Array.isArray(menuRes.data) ? menuRes.data : menuRes.data?.data || [];
@@ -244,7 +244,7 @@ export const RecipeBOMManagement = () => {
     };
 
     try {
-      const res = await api.post(`/restaurants/${restId}/inventory/recipes/${activeDish.id}/bulk`, payload);
+      const res = await api.post(`/restaurants/${restId}/recipes/${activeDish.id}/bulk`, payload);
       const savedItems = Array.isArray(res.data) ? res.data : [];
 
       // Update local recipes state
@@ -284,7 +284,7 @@ export const RecipeBOMManagement = () => {
     const restId = selectedRestaurant.id;
 
     try {
-      await api.delete(`/restaurants/${restId}/inventory/recipes/${dish.id}`);
+      await api.delete(`/restaurants/${restId}/recipes/${dish.id}`);
       setRecipes(prev => prev.filter(r => r.menu_item_id !== dish.id));
       addToast('info', 'Recipe Removed', `Recipe configuration for "${dish.name}" cleared.`);
       if (activeDish?.id === dish.id) {
