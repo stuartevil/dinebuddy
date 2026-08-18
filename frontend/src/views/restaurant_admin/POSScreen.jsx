@@ -87,12 +87,13 @@ export const POSScreen = () => {
 
   // Handle dish click to check if it has add-ons or customization
   const handleItemClick = async (dish) => {
-    if (!selectedRestaurant) return;
+    if (!selectedRestaurant || !dish) return;
     const restId = selectedRestaurant.id;
     try {
       // Check if dish has attached add-on groups (including category inherited groups)
       const res = await api.get(`/restaurants/${restId}/menu-items/${dish.id}/addon-groups`);
-      const groups = Array.isArray(res.data) ? res.data : [];
+      const rawGroups = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      const groups = rawGroups.filter(g => g && g.is_active && Array.isArray(g.options) && g.options.length > 0);
 
       if (groups.length > 0) {
         // Open Customization Popup
@@ -103,7 +104,7 @@ export const POSScreen = () => {
         // Pre-select default options if min_selectable > 0
         const init = {};
         groups.forEach(g => {
-          if (g.min_selectable > 0 && g.options && g.options.length > 0) {
+          if (g.min_selectable > 0 && Array.isArray(g.options) && g.options.length > 0) {
             init[g.id] = [g.options[0]];
           } else {
             init[g.id] = [];
@@ -115,6 +116,7 @@ export const POSScreen = () => {
         addToCartSimple(dish);
       }
     } catch (err) {
+      console.error("Error fetching add-ons for POS dish:", err);
       addToCartSimple(dish);
     }
   };
@@ -125,23 +127,23 @@ export const POSScreen = () => {
     setKotSent(false);
 
     const basePrice = parseFloat(customizingDish.price || 0);
-    const selectedOpts = Object.values(selectedAddons).flat();
-    const addonsPrice = selectedOpts.reduce((sum, o) => sum + (parseFloat(o.price || 0)), 0);
+    const selectedOpts = Object.values(selectedAddons || {}).flat().filter(Boolean);
+    const addonsPrice = selectedOpts.reduce((sum, o) => sum + (parseFloat(o?.price || 0)), 0);
     const unitPrice = basePrice + addonsPrice;
-    const addonsText = selectedOpts.map(o => o.name).join(', ');
-    const cartItemId = `${customizingDish.id}-${selectedOpts.map(o => o.id).sort().join('-')}`;
+    const addonsText = selectedOpts.map(o => o?.name).filter(Boolean).join(', ');
+    const cartItemId = `${customizingDish.id}-${selectedOpts.map(o => o?.id).sort().join('-')}`;
 
     setCart(prev => {
       const exists = prev.find(i => i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsText ? `(${addonsText})` : '')));
       if (exists) {
-        return prev.map(i => (i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsText ? `(${addonsText})` : ''))) ? { ...i, qty: i.qty + customizingQty } : i);
+        return prev.map(i => (i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsText ? `(${addonsText})` : ''))) ? { ...i, qty: i.qty + (customizingQty || 1) } : i);
       }
       return [...prev, {
         cartItemId,
         id: customizingDish.id,
         name: customizingDish.name,
         price: unitPrice,
-        qty: customizingQty,
+        qty: customizingQty || 1,
         addonsTitle: addonsText ? `(${addonsText})` : '',
         note: addonsText ? `Add-ons: ${addonsText}` : ''
       }];
@@ -534,7 +536,7 @@ export const POSScreen = () => {
                 <div key={itemKey} style={{ padding: '0.5rem 0.65rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{item.name}</span>
-                    <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-primary)' }}>₹{(item.price * item.qty).toFixed(2)}</span>
+                    <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-primary)' }}>₹{(Number(item.price || 0) * Number(item.qty || 1)).toFixed(2)}</span>
                   </div>
                   {item.addonsTitle && (
                     <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
@@ -550,7 +552,7 @@ export const POSScreen = () => {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>₹{item.price.toFixed(2)} ea</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>₹{Number(item.price || 0).toFixed(2)} ea</span>
                       <button onClick={() => removeFromCart(itemKey)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Remove item">
                         <Trash2 size={13} />
                       </button>
@@ -802,7 +804,7 @@ export const POSScreen = () => {
 
             {/* Render Groups */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.25rem' }}>
-              {customizingGroups.map(group => {
+              {(customizingGroups || []).map(group => {
                 const isSingle = group.max_selectable === 1;
                 const groupSelected = selectedAddons[group.id] || [];
 
@@ -816,7 +818,7 @@ export const POSScreen = () => {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      {group.options.map(opt => {
+                      {(group.options || []).map(opt => {
                         const isChecked = groupSelected.some(o => o.id === opt.id);
 
                         return (
@@ -864,12 +866,12 @@ export const POSScreen = () => {
 
               <button
                 type="button"
-                onClick={handleConfirmCustomization}
+                onClick={handleAddCustomizedToCart}
                 className="btn btn-primary"
                 style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               >
                 <Plus size={16} />
-                <span>Add Item • ₹{((parseFloat(customizingDish.price || 0) + Object.values(selectedAddons).flat().reduce((s, o) => s + (parseFloat(o.price || 0)), 0)) * customizingQty).toFixed(2)}</span>
+                <span>Add Item • ₹{((parseFloat(customizingDish?.price || 0) + Object.values(selectedAddons || {}).flat().reduce((s, o) => s + (parseFloat(o?.price || 0)), 0)) * (customizingQty || 1)).toFixed(2)}</span>
               </button>
             </div>
           </div>
