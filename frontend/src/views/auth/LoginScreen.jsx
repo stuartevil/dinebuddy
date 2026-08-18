@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Utensils, Lock, Mail, Eye, EyeOff, ArrowRight, UserCheck } from 'lucide-react';
+import { Utensils, Lock, Mail, Eye, EyeOff, ArrowRight } from 'lucide-react';
 
 export const LoginScreen = () => {
   const { login } = useAuth();
@@ -17,19 +17,6 @@ export const LoginScreen = () => {
     setLoading(true);
     try {
       await login(targetEmail, password);
-    } catch {
-      // error toast already shown inside login()
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePrefill = async (prefillEmail, prefillPass) => {
-    setEmail(prefillEmail);
-    setPassword(prefillPass);
-    setLoading(true);
-    try {
-      await login(prefillEmail, prefillPass);
     } catch {
       // error toast already shown inside login()
     } finally {
@@ -78,42 +65,54 @@ export const LoginScreen = () => {
 
         {/* Credentials Login Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          
           <div>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.35rem', display: 'block' }}>Email Address / Username</label>
+            <label className="label-control">Email Address</label>
             <div style={{ position: 'relative' }}>
-              <Mail size={18} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+              <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
-                type="text"
+                type="email"
                 required
-                className="input-control"
-                style={{ paddingLeft: '2.5rem' }}
-                placeholder="superadmin@dinebuddy.com"
+                placeholder="name@restaurant.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="input-control"
+                style={{ paddingLeft: '2.75rem' }}
+                autoComplete="email"
               />
             </div>
           </div>
 
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Password</label>
-              <a href="#forgot" onClick={(e) => { e.preventDefault(); alert("Password reset link sent to your registered email!"); }} style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textDecoration: 'none' }}>Forgot Password?</a>
-            </div>
+            <label className="label-control">Password</label>
             <div style={{ position: 'relative' }}>
-              <Lock size={18} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+              <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
-                className="input-control"
-                style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
-                placeholder="••••••••"
+                placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="input-control"
+                style={{ paddingLeft: '2.75rem', paddingRight: '2.75rem' }}
+                autoComplete="current-password"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '0.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -135,37 +134,6 @@ export const LoginScreen = () => {
             {loading ? 'Authenticating & Resolving Role...' : 'Sign In to DineBuddy'} <ArrowRight size={18} />
           </button>
         </form>
-
-        {/* 1-Click Quick Fill Links */}
-        <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '1.5rem', paddingTop: '1rem', textAlign: 'center' }}>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>QUICK PREFILL ACCOUNT:</span>
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button 
-              type="button" 
-              onClick={() => handlePrefill('admin@dinebuddy.com', 'Admin@123')}
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '0.75rem' }}
-            >
-              🌐 Superadmin
-            </button>
-            <button 
-              type="button" 
-              onClick={() => handlePrefill('owner@thelab93.com', 'Password@123')}
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '0.75rem' }}
-            >
-              🏪 Owner (The lab93)
-            </button>
-            <button 
-              type="button" 
-              onClick={() => handlePrefill('staff@thelab93.com', 'Password@123')}
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '0.75rem' }}
-            >
-              👨‍🍳 Staff (The lab93)
-            </button>
-          </div>
-        </div>
 
       </div>
     </div>
