@@ -12,7 +12,8 @@ import {
   Receipt,
   ImageIcon,
   Printer,
-  X
+  X,
+  Tag
 } from 'lucide-react';
 
 export const POSScreen = () => {
@@ -28,6 +29,7 @@ export const POSScreen = () => {
   const [selectedTable, setSelectedTable] = useState('Takeaway');
   const [discountType, setDiscountType] = useState('FLAT'); // 'FLAT' (₹) or 'PERCENT' (%)
   const [discountValue, setDiscountValue] = useState(0);
+  const [showDiscountInput, setShowDiscountInput] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('UPI');
   const [cart, setCart] = useState([]);
   const [kotSent, setKotSent] = useState(false);
@@ -493,20 +495,20 @@ export const POSScreen = () => {
       </div>
 
       {/* Right Column: Current Order & Checkout Desk */}
-      <div className="panel-card pos-order-desk" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', height: 'fit-content', position: 'sticky', top: '1rem' }}>
+      <div className="panel-card pos-order-desk" style={{ padding: '1rem 1.15rem', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', position: 'sticky', top: '1rem' }}>
 
         {/* Order Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.65rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.65rem' }}>
           <div>
-            <h3 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Receipt size={18} color="var(--accent-primary)" /> Current Order
+            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+              <Receipt size={16} color="var(--accent-primary)" /> Current Order
             </h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>POS Terminal Checkout</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>POS Terminal Checkout</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-secondary)', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Table:</span>
-            <select value={selectedTable} onChange={(e) => setSelectedTable(e.target.value)} className="select-control" style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 800, fontSize: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-secondary)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Table:</span>
+            <select value={selectedTable} onChange={(e) => setSelectedTable(e.target.value)} className="select-control" style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 800, fontSize: '0.8rem' }}>
               <option value="Takeaway">Takeaway</option>
               {tables.map(t => (
                 <option key={t.id} value={t.table_number || `T-${t.id}`}>
@@ -517,37 +519,42 @@ export const POSScreen = () => {
           </div>
         </div>
 
-        {/* Cart Item List */}
-        <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingRight: '0.25rem' }}>
+        {/* Cart Item List - Expands to use ALL remaining vertical height */}
+        <div style={{ flex: 1, minHeight: '100px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingRight: '0.25rem', marginBottom: '0.5rem' }}>
           {cart.length === 0 ? (
-            <div style={{ padding: '3rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              Cart is empty. Click on menu items to add to order.
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.82rem', padding: '2rem 1rem', textAlign: 'center' }}>
+              <Receipt size={32} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
+              <div>Cart is empty.</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>Click on menu items to add to order.</div>
             </div>
           ) : (
             cart.map(item => {
               const itemKey = item.cartItemId || item.id;
               return (
-                <div key={itemKey} style={{ padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{item.name}</span>
-                    <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>₹{(item.price * item.qty).toFixed(2)}</span>
+                <div key={itemKey} style={{ padding: '0.5rem 0.65rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{item.name}</span>
+                    <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-primary)' }}>₹{(item.price * item.qty).toFixed(2)}</span>
                   </div>
                   {item.addonsTitle && (
-                    <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', marginBottom: '0.35rem', fontWeight: 600 }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
                       {item.addonsTitle}
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(255,255,255,0.06)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)' }}>
-                      <button onClick={() => updateQty(itemKey, -1)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><Minus size={14} /></button>
-                      <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{item.qty}</span>
-                      <button onClick={() => updateQty(itemKey, 1)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><Plus size={14} /></button>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(255,255,255,0.06)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                      <button onClick={() => updateQty(itemKey, -1)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Minus size={12} /></button>
+                      <span style={{ fontWeight: 800, fontSize: '0.8rem', minWidth: '16px', textAlign: 'center' }}>{item.qty}</span>
+                      <button onClick={() => updateQty(itemKey, 1)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Plus size={12} /></button>
                     </div>
 
-                    <button onClick={() => removeFromCart(itemKey)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
-                      <Trash2 size={15} />
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>₹{item.price.toFixed(2)} ea</span>
+                      <button onClick={() => removeFromCart(itemKey)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Remove item">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -555,103 +562,124 @@ export const POSScreen = () => {
           )}
         </div>
 
-        {/* Financial Breakdown & Payment Controls */}
-        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            <span>Subtotal</span>
-            <span>₹{subtotal.toFixed(2)}</span>
+        {/* Financial Breakdown & Compact Checkout Controls */}
+        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.65rem', marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+          
+          {/* Summary Row: Subtotal, GST & Expandable Discount Tag */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <span>Sub: <strong style={{ color: 'var(--text-primary)' }}>₹{subtotal.toFixed(2)}</strong></span>
+              <span>•</span>
+              <span>GST ({taxRate}%): <strong style={{ color: 'var(--text-primary)' }}>₹{gst.toFixed(2)}</strong></span>
+            </div>
+
+            {/* Expandable Discount Trigger */}
+            <button
+              type="button"
+              onClick={() => setShowDiscountInput(prev => !prev)}
+              style={{
+                background: discountAmount > 0 ? 'rgba(34, 197, 94, 0.15)' : (showDiscountInput ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255, 255, 255, 0.06)'),
+                border: discountAmount > 0 ? '1px solid var(--success)' : '1px solid rgba(255, 255, 255, 0.12)',
+                color: discountAmount > 0 ? 'var(--success)' : 'var(--text-secondary)',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.3rem'
+              }}
+              title="Click to add or edit discount"
+            >
+              <Tag size={11} />
+              {discountAmount > 0 ? `-₹${discountAmount.toFixed(2)} (${discountType === 'PERCENT' ? `${discountValue}%` : 'Flat'})` : (showDiscountInput ? 'Hide' : '+ Discount')}
+            </button>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            <span>GST ({taxRate}%)</span>
-            <span>₹{gst.toFixed(2)}</span>
-          </div>
-
-          {/* Discount Section (Percentage or Flat Amount) */}
-          <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '0.6rem 0.75rem', marginTop: '0.2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                Discount {discountAmount > 0 && <span style={{ color: 'var(--success)', fontWeight: 700 }}>(-₹{discountAmount.toFixed(2)})</span>}
-              </span>
-
-              {/* Type Switcher (₹ Flat vs % Percent) */}
-              <div style={{ display: 'inline-flex', background: 'rgba(0,0,0,0.35)', borderRadius: '6px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>
+          {/* Expandable Compact Discount Bar */}
+          {(showDiscountInput || discountAmount > 0) && (
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.25)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '6px',
+              padding: '0.35rem 0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              flexWrap: 'wrap'
+            }}>
+              {/* Type Switcher */}
+              <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', padding: '1px' }}>
                 <button
                   type="button"
                   onClick={() => setDiscountType('FLAT')}
                   style={{
-                    padding: '2px 8px',
-                    fontSize: '0.72rem',
-                    fontWeight: discountType === 'FLAT' ? 700 : 500,
+                    padding: '1px 6px',
+                    fontSize: '0.68rem',
+                    fontWeight: discountType === 'FLAT' ? 700 : 400,
                     background: discountType === 'FLAT' ? 'var(--accent-primary)' : 'transparent',
                     color: discountType === 'FLAT' ? '#fff' : 'var(--text-muted)',
                     border: 'none',
-                    borderRadius: '4px',
+                    borderRadius: '3px',
                     cursor: 'pointer'
                   }}
                 >
-                  ₹ Flat
+                  ₹
                 </button>
                 <button
                   type="button"
                   onClick={() => setDiscountType('PERCENT')}
                   style={{
-                    padding: '2px 8px',
-                    fontSize: '0.72rem',
-                    fontWeight: discountType === 'PERCENT' ? 700 : 500,
+                    padding: '1px 6px',
+                    fontSize: '0.68rem',
+                    fontWeight: discountType === 'PERCENT' ? 700 : 400,
                     background: discountType === 'PERCENT' ? 'var(--accent-primary)' : 'transparent',
                     color: discountType === 'PERCENT' ? '#fff' : 'var(--text-muted)',
                     border: 'none',
-                    borderRadius: '4px',
+                    borderRadius: '3px',
                     cursor: 'pointer'
                   }}
                 >
-                  % Percent
+                  %
                 </button>
               </div>
-            </div>
 
-            {/* Input and Preset Buttons */}
-            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-              <div style={{ position: 'relative', width: '95px' }}>
-                <input
-                  type="number"
-                  min="0"
-                  max={discountType === 'PERCENT' ? 100 : subtotal}
-                  value={discountValue || ''}
-                  placeholder="0"
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    if (discountType === 'PERCENT') {
-                      setDiscountValue(Math.min(100, Math.max(0, val)));
-                    } else {
-                      setDiscountValue(Math.max(0, val));
-                    }
-                  }}
-                  className="input-control"
-                  style={{ padding: '0.25rem 0.5rem', textAlign: 'right', fontSize: '0.85rem' }}
-                />
-                <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {discountType === 'PERCENT' ? '%' : '₹'}
-                </span>
-              </div>
+              {/* Input */}
+              <input
+                type="number"
+                min="0"
+                max={discountType === 'PERCENT' ? 100 : subtotal}
+                value={discountValue || ''}
+                placeholder="0"
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  if (discountType === 'PERCENT') {
+                    setDiscountValue(Math.min(100, Math.max(0, val)));
+                  } else {
+                    setDiscountValue(Math.max(0, val));
+                  }
+                }}
+                className="input-control"
+                style={{ width: '65px', padding: '0.15rem 0.35rem', fontSize: '0.78rem', textAlign: 'right' }}
+              />
 
-              {/* Quick Presets */}
-              <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', flex: 1 }}>
-                {(discountType === 'PERCENT' ? [5, 10, 15, 20] : [20, 50, 100, 200]).map(val => (
+              {/* Quick Preset Pills */}
+              <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}>
+                {(discountType === 'PERCENT' ? [5, 10, 15, 20] : [20, 50, 100]).map(val => (
                   <button
                     key={val}
                     type="button"
                     onClick={() => setDiscountValue(val)}
                     style={{
-                      fontSize: '0.72rem',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
+                      fontSize: '0.68rem',
+                      padding: '1px 5px',
+                      borderRadius: '3px',
                       border: discountValue === val ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.1)',
-                      background: discountValue === val ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255,255,255,0.03)',
+                      background: discountValue === val ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255,255,255,0.03)',
                       color: discountValue === val ? 'var(--accent-primary)' : 'var(--text-muted)',
                       cursor: 'pointer',
-                      fontWeight: discountValue === val ? 700 : 500
+                      fontWeight: discountValue === val ? 700 : 400
                     }}
                   >
                     {discountType === 'PERCENT' ? `${val}%` : `₹${val}`}
@@ -660,71 +688,78 @@ export const POSScreen = () => {
                 {discountValue > 0 && (
                   <button
                     type="button"
-                    onClick={() => setDiscountValue(0)}
+                    onClick={() => { setDiscountValue(0); setShowDiscountInput(false); }}
                     style={{
-                      fontSize: '0.72rem',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      background: 'rgba(239, 68, 68, 0.1)',
+                      fontSize: '0.68rem',
+                      padding: '1px 5px',
+                      borderRadius: '3px',
+                      border: '1px solid rgba(239,68,68,0.3)',
+                      background: 'rgba(239,68,68,0.1)',
                       color: 'var(--danger)',
                       cursor: 'pointer'
                     }}
-                    title="Remove Discount"
+                    title="Remove discount"
                   >
                     ✕
                   </button>
                 )}
               </div>
             </div>
+          )}
 
-            {discountType === 'PERCENT' && numericDiscountVal > 0 && (
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-                {numericDiscountVal}% off on ₹{subtotal.toFixed(2)} = <strong style={{ color: 'var(--success)' }}>-₹{discountAmount.toFixed(2)}</strong>
-              </div>
-            )}
+          {/* Row: Total Due + Inline Payment Mode Pills */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.35rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Total Due</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--success)', lineHeight: '1.1' }}>₹{total.toFixed(2)}</div>
+            </div>
+
+            {/* Compact Payment Pills */}
+            <div style={{ display: 'flex', gap: '0.25rem' }}>
+              {['UPI', 'CARD', 'CASH', 'ONLINE'].map(method => (
+                <button
+                  key={method}
+                  type="button"
+                  onClick={() => setPaymentMethod(method)}
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: paymentMethod === method ? 800 : 500,
+                    padding: '0.25rem 0.45rem',
+                    borderRadius: '4px',
+                    border: paymentMethod === method ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.1)',
+                    background: paymentMethod === method ? 'var(--accent-primary)' : 'rgba(255,255,255,0.03)',
+                    color: paymentMethod === method ? '#fff' : 'var(--text-muted)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {method}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)', marginTop: '0.5rem' }}>
-            <span>TOTAL DUE</span>
-            <span>₹{total.toFixed(2)}</span>
-          </div>
-
-          {/* Payment Mode Selector */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.35rem', margin: '0.75rem 0' }}>
-            {['UPI', 'CARD', 'CASH', 'ONLINE'].map(method => (
-              <button
-                key={method}
-                onClick={() => setPaymentMethod(method)}
-                className={`btn btn-sm ${paymentMethod === method ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ fontSize: '0.75rem', padding: '0.4rem 0.2rem' }}
-              >
-                {method}
-              </button>
-            ))}
-          </div>
-
-          {/* Two-Step Takeaway Workflow: 1. Send KOT -> 2. Pay & Bill */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+          {/* 2-Column Action Buttons: Side-by-Side */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem', marginTop: '0.15rem' }}>
             <button
               onClick={handleSendToKitchen}
               disabled={cart.length === 0}
               className={`btn ${kotSent ? 'btn-secondary' : 'btn-primary'}`}
               style={{
-                width: '100%',
-                padding: '0.75rem',
+                padding: '0.65rem 0.4rem',
                 fontWeight: 800,
-                fontSize: '0.9rem',
+                fontSize: '0.78rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.5rem',
+                gap: '0.35rem',
                 border: kotSent ? '1px solid var(--success)' : 'none',
-                color: kotSent ? 'var(--success)' : '#fff'
+                color: kotSent ? 'var(--success)' : '#fff',
+                whiteSpace: 'nowrap'
               }}
+              title="Print KOT and send items to kitchen"
             >
-              <Printer size={18} />
-              {kotSent ? '✔️ KOT SENT TO KITCHEN (RE-PRINT KOT)' : '🔥 1. SEND TO KITCHEN (PRINT KOT)'}
+              <Printer size={15} />
+              {kotSent ? 'KOT Sent' : '1. Send KOT'}
             </button>
 
             <button
@@ -732,18 +767,19 @@ export const POSScreen = () => {
               disabled={cart.length === 0}
               className="btn btn-success"
               style={{
-                width: '100%',
-                padding: '0.85rem',
+                padding: '0.65rem 0.4rem',
                 fontWeight: 800,
-                fontSize: '0.95rem',
+                fontSize: '0.78rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.5rem'
+                gap: '0.35rem',
+                whiteSpace: 'nowrap'
               }}
+              title="Complete checkout & print receipt"
             >
-              <CheckCircle size={18} />
-              💳 2. COLLECT PAYMENT &amp; PRINT BILL
+              <CheckCircle size={15} />
+              2. Pay & Bill
             </button>
           </div>
         </div>
