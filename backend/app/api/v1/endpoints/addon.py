@@ -13,6 +13,8 @@ from app.schemas.addon_schema import (
     AddonOptionCreate,
     AddonOptionRead,
     AttachAddonGroupsToItem,
+    AttachAddonGroupsToCategory,
+    AttachCategoriesToAddonGroup,
 )
 from app.services import addon_service
 
@@ -128,5 +130,54 @@ def get_item_addon_groups(
     item_id: int,
     db: Session = Depends(get_db),
 ):
-    """Get active add-on groups linked to a specific menu dish."""
+    """Get active add-on groups linked to a specific menu dish (including category-inherited groups)."""
     return addon_service.get_item_addon_groups(db, item_id, restaurant_id)
+
+
+@router.post("/menu-categories/{category_id}/addon-groups", response_model=List[AddonGroupRead])
+def attach_addon_groups_to_category(
+    restaurant_id: int,
+    category_id: int,
+    payload: AttachAddonGroupsToCategory,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+):
+    """Attach/Link add-on groups to an entire menu category."""
+    require_roles(current_user, (UserRole.ADMIN, UserRole.RESTAURANT_ADMIN))
+    check_restaurant_access(restaurant_id, current_user, db)
+    return addon_service.attach_addon_groups_to_category(db, category_id, restaurant_id, payload.group_ids)
+
+
+@router.get("/menu-categories/{category_id}/addon-groups", response_model=List[AddonGroupRead])
+def get_category_addon_groups(
+    restaurant_id: int,
+    category_id: int,
+    db: Session = Depends(get_db),
+):
+    """Get active add-on groups linked to an entire menu category."""
+    return addon_service.get_category_addon_groups(db, category_id, restaurant_id)
+
+
+@router.post("/addon-groups/{group_id}/categories", response_model=List[int])
+def attach_categories_to_addon_group(
+    restaurant_id: int,
+    group_id: int,
+    payload: AttachCategoriesToAddonGroup,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+):
+    """Link categories to an add-on group."""
+    require_roles(current_user, (UserRole.ADMIN, UserRole.RESTAURANT_ADMIN))
+    check_restaurant_access(restaurant_id, current_user, db)
+    return addon_service.attach_categories_to_addon_group(db, group_id, restaurant_id, payload.category_ids)
+
+
+@router.get("/addon-groups/{group_id}/categories", response_model=List[int])
+def get_addon_group_categories(
+    restaurant_id: int,
+    group_id: int,
+    db: Session = Depends(get_db),
+):
+    """Get category IDs linked to an add-on group."""
+    return addon_service.get_addon_group_category_ids(db, group_id, restaurant_id)
+

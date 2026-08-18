@@ -36,6 +36,7 @@ class AddonGroupBase(BaseModel):
 
 class AddonGroupCreate(AddonGroupBase):
     options: Optional[List[AddonOptionCreate]] = []
+    category_ids: Optional[List[int]] = []
 
 
 class AddonGroupUpdate(BaseModel):
@@ -43,12 +44,14 @@ class AddonGroupUpdate(BaseModel):
     min_selectable: Optional[int] = None
     max_selectable: Optional[int] = None
     is_active: Optional[bool] = None
+    category_ids: Optional[List[int]] = None
 
 
 class AddonGroupRead(AddonGroupBase):
     id: int
     restaurant_id: int
     options: List[AddonOptionRead] = []
+    category_ids: List[int] = []
 
     class Config:
         from_attributes = True
@@ -56,3 +59,12 @@ class AddonGroupRead(AddonGroupBase):
 
 class AttachAddonGroupsToItem(BaseModel):
     group_ids: List[int]
+
+
+class AttachAddonGroupsToCategory(BaseModel):
+    group_ids: List[int]
+
+
+class AttachCategoriesToAddonGroup(BaseModel):
+    category_ids: List[int]
+

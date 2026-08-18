@@ -26,7 +26,8 @@ export const POSScreen = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [selectedTable, setSelectedTable] = useState('Takeaway');
-  const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState('FLAT'); // 'FLAT' (₹) or 'PERCENT' (%)
+  const [discountValue, setDiscountValue] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('UPI');
   const [cart, setCart] = useState([]);
   const [kotSent, setKotSent] = useState(false);
@@ -82,41 +83,52 @@ export const POSScreen = () => {
     });
   }, [selectedRestaurant]);
 
+  // Handle dish click to check if it has add-ons or customization
   const handleItemClick = async (dish) => {
     if (!selectedRestaurant) return;
+    const restId = selectedRestaurant.id;
     try {
-      const restId = selectedRestaurant.id;
+      // Check if dish has attached add-on groups (including category inherited groups)
       const res = await api.get(`/restaurants/${restId}/menu-items/${dish.id}/addon-groups`);
-      const groups = (res.data || []).filter(g => g.is_active && g.options && g.options.length > 0);
+      const groups = Array.isArray(res.data) ? res.data : [];
+
       if (groups.length > 0) {
+        // Open Customization Popup
         setCustomizingDish(dish);
         setCustomizingGroups(groups);
         setCustomizingQty(1);
+
+        // Pre-select default options if min_selectable > 0
         const init = {};
         groups.forEach(g => {
-          if (g.min_selectable > 0 && g.options.length > 0) {
+          if (g.min_selectable > 0 && g.options && g.options.length > 0) {
             init[g.id] = [g.options[0]];
           } else {
             init[g.id] = [];
           }
         });
         setSelectedAddons(init);
-        return;
+      } else {
+        // Simple item without add-ons -> add directly to cart
+        addToCartSimple(dish);
       }
-    } catch (e) {}
-    addToCart(dish);
+    } catch (err) {
+      addToCartSimple(dish);
+    }
   };
 
-  const handleConfirmCustomization = () => {
+  // Add customized item with selected options to cart
+  const handleAddCustomizedToCart = () => {
     if (!customizingDish) return;
+    setKotSent(false);
+
     const basePrice = parseFloat(customizingDish.price || 0);
     const selectedOpts = Object.values(selectedAddons).flat();
     const addonsPrice = selectedOpts.reduce((sum, o) => sum + (parseFloat(o.price || 0)), 0);
     const unitPrice = basePrice + addonsPrice;
     const addonsText = selectedOpts.map(o => o.name).join(', ');
-    const cartItemId = `${customizingDish.id}_${selectedOpts.map(o => o.id).sort().join('_')}`;
+    const cartItemId = `${customizingDish.id}-${selectedOpts.map(o => o.id).sort().join('-')}`;
 
-    setKotSent(false);
     setCart(prev => {
       const exists = prev.find(i => i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsText ? `(${addonsText})` : '')));
       if (exists) {
@@ -132,12 +144,16 @@ export const POSScreen = () => {
         note: addonsText ? `Add-ons: ${addonsText}` : ''
       }];
     });
+
     setCustomizingDish(null);
+    setCustomizingGroups([]);
+    setSelectedAddons({});
+    setCustomizingQty(1);
   };
 
-  const addToCart = (item) => {
+  const addToCartSimple = (item) => {
     setKotSent(false);
-    const itemPrice = parseFloat(item.price) || 0;
+    const itemPrice = parseFloat(item.price || 0);
     setCart(prev => {
       const exists = prev.find(i => i.id === item.id && !i.addonsTitle);
       if (exists) {
@@ -166,8 +182,16 @@ export const POSScreen = () => {
 
   const subtotal = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
   const taxRate = restaurantTaxRate !== null && restaurantTaxRate !== undefined ? restaurantTaxRate : 5;
-  const gst = subtotal * (taxRate / 100);
-  const total = Math.max(0, subtotal + gst - discount);
+  
+  // Calculate discount based on Type (Percentage or Flat Amount)
+  const numericDiscountVal = parseFloat(discountValue) || 0;
+  const discountAmount = discountType === 'PERCENT'
+    ? Math.round((subtotal * (Math.min(100, Math.max(0, numericDiscountVal)) / 100)) * 100) / 100
+    : Math.min(subtotal, Math.max(0, numericDiscountVal));
+
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+  const gst = discountedSubtotal * (taxRate / 100);
+  const total = Math.max(0, discountedSubtotal + gst);
 
   const handlePrintCartKOT = () => {
     if (cart.length === 0) return;
@@ -189,7 +213,7 @@ export const POSScreen = () => {
       items: cart,
       subtotal,
       gst,
-      discount,
+      discount: discountAmount,
       total,
       payment_method: paymentMethod,
       payment_status: 'PAID'
@@ -291,7 +315,7 @@ export const POSScreen = () => {
       // Complete checkout & mark session as PAID
       const checkoutPayload = {
         payment_method: (paymentMethod || 'cash').toLowerCase(),
-        discount: parseFloat(discount) || 0.0
+        discount: parseFloat(discountAmount) || 0.0
       };
 
       await api.post(`/tables/${targetTableId}/checkout`, checkoutPayload);
@@ -304,7 +328,7 @@ export const POSScreen = () => {
         items: cart,
         subtotal,
         gst,
-        discount,
+        discount: discountAmount,
         total,
         payment_method: paymentMethod,
         payment_status: 'PAID'
@@ -313,14 +337,16 @@ export const POSScreen = () => {
 
       addToast('success', '💳 Payment Received & Bill Printed!', `₹${total.toFixed(2)} collected via ${paymentMethod}.`);
       setCart([]);
-      setDiscount(0);
+      setDiscountValue(0);
+      setDiscountType('FLAT');
       setKotSent(false);
     } catch (err) {
       console.error("POS Checkout error:", err);
       handlePrintCartBill();
       addToast('success', 'Payment Received & Bill Printed!', `₹${total.toFixed(2)} collected via ${paymentMethod}.`);
       setCart([]);
-      setDiscount(0);
+      setDiscountValue(0);
+      setDiscountType('FLAT');
       setKotSent(false);
     }
   };
@@ -541,9 +567,122 @@ export const POSScreen = () => {
             <span>₹{gst.toFixed(2)}</span>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            <span>Discount (₹)</span>
-            <input type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="input-control" style={{ width: '80px', padding: '0.2rem 0.5rem', textAlign: 'right' }} />
+          {/* Discount Section (Percentage or Flat Amount) */}
+          <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '0.6rem 0.75rem', marginTop: '0.2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Discount {discountAmount > 0 && <span style={{ color: 'var(--success)', fontWeight: 700 }}>(-₹{discountAmount.toFixed(2)})</span>}
+              </span>
+
+              {/* Type Switcher (₹ Flat vs % Percent) */}
+              <div style={{ display: 'inline-flex', background: 'rgba(0,0,0,0.35)', borderRadius: '6px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <button
+                  type="button"
+                  onClick={() => setDiscountType('FLAT')}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '0.72rem',
+                    fontWeight: discountType === 'FLAT' ? 700 : 500,
+                    background: discountType === 'FLAT' ? 'var(--accent-primary)' : 'transparent',
+                    color: discountType === 'FLAT' ? '#fff' : 'var(--text-muted)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ₹ Flat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiscountType('PERCENT')}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '0.72rem',
+                    fontWeight: discountType === 'PERCENT' ? 700 : 500,
+                    background: discountType === 'PERCENT' ? 'var(--accent-primary)' : 'transparent',
+                    color: discountType === 'PERCENT' ? '#fff' : 'var(--text-muted)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  % Percent
+                </button>
+              </div>
+            </div>
+
+            {/* Input and Preset Buttons */}
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              <div style={{ position: 'relative', width: '95px' }}>
+                <input
+                  type="number"
+                  min="0"
+                  max={discountType === 'PERCENT' ? 100 : subtotal}
+                  value={discountValue || ''}
+                  placeholder="0"
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    if (discountType === 'PERCENT') {
+                      setDiscountValue(Math.min(100, Math.max(0, val)));
+                    } else {
+                      setDiscountValue(Math.max(0, val));
+                    }
+                  }}
+                  className="input-control"
+                  style={{ padding: '0.25rem 0.5rem', textAlign: 'right', fontSize: '0.85rem' }}
+                />
+                <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {discountType === 'PERCENT' ? '%' : '₹'}
+                </span>
+              </div>
+
+              {/* Quick Presets */}
+              <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', flex: 1 }}>
+                {(discountType === 'PERCENT' ? [5, 10, 15, 20] : [20, 50, 100, 200]).map(val => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setDiscountValue(val)}
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      border: discountValue === val ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.1)',
+                      background: discountValue === val ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255,255,255,0.03)',
+                      color: discountValue === val ? 'var(--accent-primary)' : 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontWeight: discountValue === val ? 700 : 500
+                    }}
+                  >
+                    {discountType === 'PERCENT' ? `${val}%` : `₹${val}`}
+                  </button>
+                ))}
+                {discountValue > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setDiscountValue(0)}
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      color: 'var(--danger)',
+                      cursor: 'pointer'
+                    }}
+                    title="Remove Discount"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {discountType === 'PERCENT' && numericDiscountVal > 0 && (
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                {numericDiscountVal}% off on ₹{subtotal.toFixed(2)} = <strong style={{ color: 'var(--success)' }}>-₹{discountAmount.toFixed(2)}</strong>
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)', marginTop: '0.5rem' }}>

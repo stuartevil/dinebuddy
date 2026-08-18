@@ -24,8 +24,9 @@ export const MenuManagement = () => {
   const [editAddonGroupIds, setEditAddonGroupIds] = useState([]);
 
   // Add-on groups management state
-  const [newGroup, setNewGroup] = useState({ name: '', min_selectable: 0, max_selectable: 10 });
+  const [newGroup, setNewGroup] = useState({ name: '', min_selectable: 0, max_selectable: 10, category_ids: [] });
   const [newOptionGroup, setNewOptionGroup] = useState({});
+  const [categoryAddonModal, setCategoryAddonModal] = useState({ show: false, category: null, groupIds: [] });
 
   // Bulk import state
   const [importFile, setImportFile] = useState(null);
@@ -76,13 +77,67 @@ export const MenuManagement = () => {
         name: newGroup.name.trim(),
         min_selectable: Number(newGroup.min_selectable),
         max_selectable: Number(newGroup.max_selectable),
-        is_active: true
+        is_active: true,
+        category_ids: newGroup.category_ids || []
       });
       setAddonGroups(prev => [...prev, res.data]);
-      setNewGroup({ name: '', min_selectable: 0, max_selectable: 10 });
+      setNewGroup({ name: '', min_selectable: 0, max_selectable: 10, category_ids: [] });
       addToast('success', 'Group Created', `Add-on Group "${res.data.name}" created!`);
     } catch (err) {
       addToast('error', 'Creation Failed', 'Could not create add-on group.');
+    }
+  };
+
+  const handleToggleGroupCategory = async (groupId, catId) => {
+    if (!selectedRestaurant) return;
+    const group = addonGroups.find(g => g.id === groupId);
+    if (!group) return;
+    const currentCats = group.category_ids || [];
+    const updatedCats = currentCats.includes(catId)
+      ? currentCats.filter(id => id !== catId)
+      : [...currentCats, catId];
+
+    try {
+      const res = await api.post(`/restaurants/${selectedRestaurant.id}/addon-groups/${groupId}/categories`, {
+        category_ids: updatedCats
+      });
+      setAddonGroups(prev => prev.map(g => g.id === groupId ? { ...g, category_ids: res.data || updatedCats } : g));
+      addToast('success', 'Categories Updated', `Updated categories for "${group.name}".`);
+    } catch (err) {
+      addToast('error', 'Update Failed', 'Could not update category linking.');
+    }
+  };
+
+  const handleOpenCategoryAddons = (category) => {
+    const linkedGroupIds = addonGroups
+      .filter(g => (g.category_ids || []).includes(category.id))
+      .map(g => g.id);
+    setCategoryAddonModal({ show: true, category, groupIds: linkedGroupIds });
+  };
+
+  const handleSaveCategoryAddons = async (e) => {
+    e.preventDefault();
+    if (!categoryAddonModal.category || !selectedRestaurant) return;
+    const catId = categoryAddonModal.category.id;
+    const selectedGroupIds = categoryAddonModal.groupIds;
+    try {
+      await api.post(`/restaurants/${selectedRestaurant.id}/menu-categories/${catId}/addon-groups`, {
+        group_ids: selectedGroupIds
+      });
+      setAddonGroups(prev => prev.map(g => {
+        const had = (g.category_ids || []).includes(catId);
+        const nowHas = selectedGroupIds.includes(g.id);
+        if (had && !nowHas) {
+          return { ...g, category_ids: (g.category_ids || []).filter(id => id !== catId) };
+        } else if (!had && nowHas) {
+          return { ...g, category_ids: [...(g.category_ids || []), catId] };
+        }
+        return g;
+      }));
+      addToast('success', 'Category Add-ons Saved', `Add-ons updated for "${categoryAddonModal.category.name}"!`);
+      setCategoryAddonModal({ show: false, category: null, groupIds: [] });
+    } catch (err) {
+      addToast('error', 'Save Failed', 'Could not update category add-on groups.');
     }
   };
 
@@ -468,18 +523,41 @@ export const MenuManagement = () => {
               No custom categories created yet. Click "+ Add Category" to create your first category.
             </span>
           ) : (
-            visibleCategories.map(c => (
-              <span key={c.id} className="badge badge-role" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                📁 {c.name} <span style={{ opacity: 0.75, fontSize: '0.72rem', background: 'rgba(255, 255, 255, 0.15)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>ID: {c.id}</span>
-                <button
-                  onClick={() => handleDeleteCategory(c.id, c.name)}
-                  style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '0.2rem' }}
-                  title="Delete Category"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </span>
-            ))
+            visibleCategories.map(c => {
+              const linkedAddonCount = addonGroups.filter(g => (g.category_ids || []).includes(c.id)).length;
+              return (
+                <span key={c.id} className="badge badge-role" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                  📁 {c.name} <span style={{ opacity: 0.75, fontSize: '0.72rem', background: 'rgba(255, 255, 255, 0.15)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>ID: {c.id}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCategoryAddons(c)}
+                    style={{
+                      background: linkedAddonCount > 0 ? 'rgba(99, 102, 241, 0.35)' : 'rgba(255, 255, 255, 0.08)',
+                      border: linkedAddonCount > 0 ? '1px solid var(--accent-primary)' : '1px solid rgba(255, 255, 255, 0.15)',
+                      color: linkedAddonCount > 0 ? 'var(--accent-primary)' : 'var(--text-muted)',
+                      borderRadius: '4px',
+                      padding: '1px 6px',
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.2rem',
+                      fontWeight: 600
+                    }}
+                    title="Manage Add-on Groups for this Category"
+                  >
+                    ⚡ Add-ons ({linkedAddonCount})
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCategory(c.id, c.name)}
+                    style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '0.1rem' }}
+                    title="Delete Category"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </span>
+              );
+            })
           )}
         </div>
       </div>
@@ -697,30 +775,65 @@ export const MenuManagement = () => {
               {/* Attach Add-on Groups Selection */}
               <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.4rem', display: 'block', color: 'var(--accent-primary)' }}>
-                  🔗 Attach Add-on Groups for this Dish:
+                  🔗 Add-on Groups for this Dish:
                 </label>
+
+                {/* Show category-inherited groups */}
+                {(() => {
+                  const catId = Number(editForm.category_id);
+                  const inheritedGroups = addonGroups.filter(g => (g.category_ids || []).includes(catId));
+                  if (inheritedGroups.length > 0) {
+                    return (
+                      <div style={{ marginBottom: '0.6rem', padding: '0.5rem', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '6px', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '0.25rem' }}>
+                          ✨ Inherited from Category ({inheritedGroups.length}):
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                          {inheritedGroups.map(g => (
+                            <span key={g.id} className="badge" style={{ background: 'rgba(99, 102, 241, 0.25)', color: 'var(--text-primary)', fontSize: '0.72rem' }}>
+                              ✓ {g.name} ({(g.options || []).map(o => o.name).join(', ') || 'No options'})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                  Additional Dish-Specific Add-ons:
+                </div>
                 {addonGroups.length === 0 ? (
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                     No Add-on Groups created yet. Use "Manage Add-ons" on the banner to create groups first.
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '120px', overflowY: 'auto' }}>
-                    {addonGroups.map(g => (
-                      <label key={g.id} style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={editAddonGroupIds.includes(g.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setEditAddonGroupIds(prev => [...prev, g.id]);
-                            } else {
-                              setEditAddonGroupIds(prev => prev.filter(id => id !== g.id));
-                            }
-                          }}
-                        />
-                        <span><strong>{g.name}</strong> <span style={{ opacity: 0.7, fontSize: '0.72rem' }}>({(g.options || []).map(o => o.name).join(', ') || 'No options'})</span></span>
-                      </label>
-                    ))}
+                    {addonGroups.map(g => {
+                      const isInherited = (g.category_ids || []).includes(Number(editForm.category_id));
+                      return (
+                        <label key={g.id} style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: isInherited ? 'default' : 'pointer', opacity: isInherited ? 0.65 : 1 }}>
+                          <input
+                            type="checkbox"
+                            disabled={isInherited}
+                            checked={isInherited || editAddonGroupIds.includes(g.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setEditAddonGroupIds(prev => [...prev, g.id]);
+                              } else {
+                                setEditAddonGroupIds(prev => prev.filter(id => id !== g.id));
+                              }
+                            }}
+                          />
+                          <span>
+                            <strong>{g.name}</strong>{' '}
+                            {isInherited && <span style={{ color: 'var(--accent-primary)', fontSize: '0.7rem', fontWeight: 600 }}>[Applied via Category]</span>}{' '}
+                            <span style={{ opacity: 0.7, fontSize: '0.72rem' }}>({(g.options || []).map(o => o.name).join(', ') || 'No options'})</span>
+                          </span>
+                        </label>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -971,6 +1084,48 @@ export const MenuManagement = () => {
                   />
                 </div>
               </div>
+
+              {/* Apply to entire Categories */}
+              <div style={{ marginBottom: '0.75rem', padding: '0.5rem', background: 'rgba(0,0,0,0.15)', borderRadius: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', display: 'block', marginBottom: '0.35rem' }}>
+                  📂 Apply to Entire Categories (Optional):
+                </label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {visibleCategories.length === 0 ? (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No categories created yet.</span>
+                  ) : (
+                    visibleCategories.map(c => {
+                      const isSelected = (newGroup.category_ids || []).includes(c.id);
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            const cur = newGroup.category_ids || [];
+                            setNewGroup({
+                              ...newGroup,
+                              category_ids: isSelected ? cur.filter(id => id !== c.id) : [...cur, c.id]
+                            });
+                          }}
+                          style={{
+                            fontSize: '0.75rem',
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: '20px',
+                            border: isSelected ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.15)',
+                            background: isSelected ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255,255,255,0.03)',
+                            color: isSelected ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            fontWeight: isSelected ? 700 : 500
+                          }}
+                        >
+                          {isSelected ? '✓ ' : '+ '} {c.name}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button type="submit" className="btn btn-primary btn-sm">
                   + Create Group
@@ -1001,6 +1156,42 @@ export const MenuManagement = () => {
                       >
                         <Trash2 size={14} />
                       </button>
+                    </div>
+
+                    {/* Category Linking Controls */}
+                    <div style={{ marginBottom: '0.75rem', padding: '0.5rem', background: 'rgba(0,0,0,0.18)', borderRadius: '6px' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                        📂 APPLIED TO CATEGORIES (Click to toggle):
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        {visibleCategories.length === 0 ? (
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>No categories available</span>
+                        ) : (
+                          visibleCategories.map(c => {
+                            const isLinked = (group.category_ids || []).includes(c.id);
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => handleToggleGroupCategory(group.id, c.id)}
+                                style={{
+                                  fontSize: '0.72rem',
+                                  padding: '0.2rem 0.55rem',
+                                  borderRadius: '4px',
+                                  border: isLinked ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.1)',
+                                  background: isLinked ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255,255,255,0.02)',
+                                  color: isLinked ? 'var(--accent-primary)' : 'var(--text-muted)',
+                                  cursor: 'pointer',
+                                  fontWeight: isLinked ? 700 : 400
+                                }}
+                                title={isLinked ? `Attached to ${c.name}. Click to remove.` : `Click to attach to all items in ${c.name}`}
+                              >
+                                {isLinked ? '✓ ' : '+ '} {c.name}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
 
                     {/* Options inside this Group */}
@@ -1064,7 +1255,91 @@ export const MenuManagement = () => {
         </div>
       )}
 
+      {/* Modal 6: Category Add-ons Manager Modal */}
+      {categoryAddonModal.show && categoryAddonModal.category && (
+        <div className="modal-backdrop">
+          <div className="modal-box" style={{ maxWidth: '520px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
+                ⚡ Category Add-ons: {categoryAddonModal.category.name}
+              </h3>
+              <button
+                onClick={() => setCategoryAddonModal({ show: false, category: null, groupIds: [] })}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: '1.4' }}>
+              Select add-on groups that will automatically apply to <strong>all dishes</strong> in the "<strong>{categoryAddonModal.category.name}</strong>" category.
+            </p>
+
+            <form onSubmit={handleSaveCategoryAddons}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto', marginBottom: '1.25rem' }}>
+                {addonGroups.length === 0 ? (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '1.5rem', textAlign: 'center' }}>
+                    No Add-on Groups created yet. Please create groups in "Manage Add-ons" first.
+                  </div>
+                ) : (
+                  addonGroups.map(g => {
+                    const isChecked = categoryAddonModal.groupIds.includes(g.id);
+                    return (
+                      <label
+                        key={g.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: '0.65rem 0.75rem',
+                          borderRadius: '6px',
+                          background: isChecked ? 'rgba(99, 102, 241, 0.12)' : 'rgba(255,255,255,0.03)',
+                          border: isChecked ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid rgba(255,255,255,0.06)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setCategoryAddonModal(prev => ({ ...prev, groupIds: [...prev.groupIds, g.id] }));
+                            } else {
+                              setCategoryAddonModal(prev => ({ ...prev, groupIds: prev.groupIds.filter(id => id !== g.id) }));
+                            }
+                          }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{g.name}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            Options: {(g.options || []).map(o => `${o.name} (+₹${o.price})`).join(', ') || 'No options'}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setCategoryAddonModal({ show: false, category: null, groupIds: [] })}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Save Category Add-ons
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+
 

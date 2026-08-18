@@ -56,3 +56,19 @@ class MenuItemAddonGroupMap(Base, TimestampMixin):
         ForeignKey("addon_groups.id", ondelete="CASCADE"),
         primary_key=True,
     )
+
+
+class MenuCategoryAddonGroupMap(Base, TimestampMixin):
+    __tablename__ = "menu_category_addon_group_map"
+
+    category_id = Column(
+        Integer,
+        ForeignKey("menu_categories.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    group_id = Column(
+        Integer,
+        ForeignKey("addon_groups.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
