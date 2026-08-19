@@ -22,7 +22,7 @@ export const CustomerQRApp = () => {
   const [logoError, setLogoError] = useState(false);
 
   // Toggle to bypass Firebase SMS OTP for testing/development (Set to false to re-enable strict OTP)
-  const BYPASS_FIREBASE_OTP = true;
+  const BYPASS_FIREBASE_OTP = false;
 
   // Step state: 1 = Welcome & Login, 2 = Menu & Cart, 3 = Order Tracking
   const [currentStep, setCurrentStep] = useState(BYPASS_FIREBASE_OTP ? 2 : 1);
