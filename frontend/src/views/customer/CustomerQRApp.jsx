@@ -6,7 +6,8 @@ import {
   Utensils, Search, Plus, Minus, ShoppingCart, 
   CheckCircle2, Clock, UtensilsCrossed, Phone, 
   User, Lock, ArrowRight, X, Sparkles, ChefHat, 
-  Bell, CheckCheck, RefreshCw, LogOut, ShieldCheck
+  Bell, CheckCheck, RefreshCw, LogOut, ShieldCheck,
+  Trash2, ShoppingBag
 } from 'lucide-react';
 
 export const CustomerQRApp = () => {
@@ -42,6 +43,7 @@ export const CustomerQRApp = () => {
   const [vegOnly, setVegOnly] = useState(false);
   const [cart, setCart] = useState([]);
   const [specialInstructions, setSpecialInstructions] = useState({});
+  const [showReviewModal, setShowReviewModal] = useState(false);
 
   // Active Placed Order & Live Tracking State
   const [activeOrder, setActiveOrder] = useState(null);
@@ -294,9 +296,20 @@ export const CustomerQRApp = () => {
     });
   };
 
+  const deleteFromCart = (cartItemId) => {
+    setCart(prev => prev.filter(i => (i.cartItemId || i.id) !== cartItemId));
+  };
+
   const subtotal = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
   const gst = subtotal * 0.05;
   const total = subtotal + gst;
+
+  // Auto-close review modal if cart becomes empty
+  useEffect(() => {
+    if (cart.length === 0) {
+      setShowReviewModal(false);
+    }
+  }, [cart]);
 
   // Submit Order to Backend (Step 2 -> Step 3)
   const handlePlaceOrder = async () => {
@@ -321,6 +334,7 @@ export const CustomerQRApp = () => {
       const res = await api.post(orderUrl, orderPayload);
       setActiveOrder(res.data);
       setCart([]);
+      setShowReviewModal(false);
       setCurrentStep(3); // Move to Step 3: Order Tracking
     } catch {
       setActiveOrder({
@@ -337,6 +351,7 @@ export const CustomerQRApp = () => {
         total: total
       });
       setCart([]);
+      setShowReviewModal(false);
       setCurrentStep(3);
     } finally {
       setPlacingOrder(false);
@@ -781,16 +796,205 @@ export const CustomerQRApp = () => {
 
       {/* Floating Bottom Cart Bar (Step 2 Only) */}
       {currentStep === 2 && cart.length > 0 && (
-        <div style={{ position: 'sticky', bottom: '1rem', padding: '0 1rem', marginTop: 'auto' }}>
-          <div className="panel-card" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff', padding: '0.85rem 1.15rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 'var(--radius-lg)', boxShadow: '0 15px 35px rgba(99, 102, 241, 0.4)' }}>
+        <div style={{ position: 'sticky', bottom: '1rem', padding: '0 1rem', marginTop: 'auto', zIndex: 100 }}>
+          <div 
+            onClick={() => setShowReviewModal(true)}
+            className="panel-card" 
+            style={{ 
+              background: 'linear-gradient(135deg, #6366f1, #4f46e5)', 
+              color: '#fff', 
+              padding: '0.85rem 1.15rem', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              borderRadius: 'var(--radius-lg)', 
+              boxShadow: '0 15px 35px rgba(99, 102, 241, 0.4)',
+              cursor: 'pointer'
+            }}
+          >
             <div>
-              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{cart.reduce((s, i) => s + i.qty, 0)} Items Selected</div>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ShoppingCart size={18} /> {cart.reduce((s, i) => s + i.qty, 0)} Items Selected
+              </div>
               <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Total: ₹{total.toFixed(2)} (incl. tax)</span>
             </div>
 
-            <button onClick={handlePlaceOrder} disabled={placingOrder} className="btn btn-secondary btn-sm" style={{ background: '#fff', color: '#4f46e5', fontWeight: 800, border: 'none', padding: '0.5rem 0.85rem' }}>
-              {placingOrder ? 'Sending...' : 'Confirm & Order 🚀'}
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowReviewModal(true);
+              }} 
+              className="btn btn-secondary btn-sm" 
+              style={{ background: '#fff', color: '#4f46e5', fontWeight: 800, border: 'none', padding: '0.55rem 0.95rem', borderRadius: '9999px', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              Review & Order 🛒
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* REVIEW ORDER & CART MODAL                                                 */}
+      {/* ========================================================================= */}
+      {showReviewModal && (
+        <div className="modal-backdrop" style={{ zIndex: 1050 }}>
+          <div className="modal-box" style={{ maxWidth: '480px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: '1.25rem', borderRadius: '24px' }}>
+            
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <ShoppingCart size={20} color="var(--accent-primary)" /> Review Order
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Table #{tableData?.table_number || tableId} • {restaurantData?.name || 'Restaurant'}
+                </span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowReviewModal(false)} 
+                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Items List (Scrollable) */}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingRight: '4px', marginBottom: '1rem' }}>
+              {cart.map((item, idx) => {
+                const cartItemId = item.cartItemId || item.id;
+                const itemPrice = parseFloat(item.price || 0);
+                const itemTotalPrice = itemPrice * item.qty;
+
+                return (
+                  <div key={cartItemId || idx} style={{ background: 'var(--bg-secondary)', padding: '0.85rem', borderRadius: '16px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1, paddingRight: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{
+                            width: '12px',
+                            height: '12px',
+                            border: `2px solid ${item.is_veg ? '#22c55e' : '#ef4444'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '3px',
+                            flexShrink: 0
+                          }}>
+                            <div style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              background: item.is_veg ? '#22c55e' : '#ef4444'
+                            }} />
+                          </div>
+                          <span style={{ fontWeight: 800, fontSize: '0.92rem' }}>{item.name}</span>
+                        </div>
+                        {item.addonsTitle && (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', display: 'block', marginTop: '2px' }}>
+                            {item.addonsTitle}
+                          </span>
+                        )}
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+                          ₹{itemPrice.toFixed(2)} each
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-primary)', padding: '0.25rem 0.5rem', borderRadius: '9999px', border: '1px solid var(--border-color)' }}>
+                          <button
+                            type="button"
+                            onClick={() => removeFromCart(cartItemId)}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px' }}
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span style={{ fontWeight: 800, fontSize: '0.88rem', minWidth: '16px', textAlign: 'center' }}>
+                            {item.qty}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => addToCart(item)}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px' }}
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => deleteFromCart(cartItemId)}
+                          style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', color: 'var(--danger)', cursor: 'pointer', borderRadius: '8px', padding: '0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Remove item"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.4rem', borderTop: '1px dashed var(--border-color)', fontSize: '0.8rem' }}>
+                      <input
+                        type="text"
+                        placeholder="Cooking note (e.g. less spicy)..."
+                        value={specialInstructions[item.id] || ''}
+                        onChange={(e) => setSpecialInstructions({ ...specialInstructions, [item.id]: e.target.value })}
+                        style={{
+                          flex: 1,
+                          marginRight: '0.75rem',
+                          background: 'transparent',
+                          border: 'none',
+                          fontSize: '0.75rem',
+                          color: 'var(--text-secondary)',
+                          outline: 'none'
+                        }}
+                      />
+                      <span style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                        ₹{itemTotalPrice.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Price Breakdown */}
+            <div style={{ background: 'var(--bg-secondary)', padding: '0.85rem', borderRadius: '16px', border: '1px solid var(--border-color)', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                <span>Item Subtotal</span>
+                <span>₹{subtotal.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                <span>Taxes & GST (5%)</span>
+                <span>₹{gst.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.98rem', color: 'var(--text-primary)', paddingTop: '0.4rem', borderTop: '1px solid var(--border-color)', marginTop: '0.2rem' }}>
+                <span>Total Amount</span>
+                <span style={{ color: 'var(--accent-primary)' }}>₹{total.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '0.65rem' }}>
+              <button
+                type="button"
+                onClick={() => setShowReviewModal(false)}
+                className="btn btn-secondary"
+                style={{ flex: 1, padding: '0.75rem', fontWeight: 700, fontSize: '0.88rem' }}
+              >
+                ➕ Add More
+              </button>
+              <button
+                type="button"
+                onClick={handlePlaceOrder}
+                disabled={placingOrder || cart.length === 0}
+                className="btn btn-primary"
+                style={{ flex: 1.5, padding: '0.75rem', fontWeight: 800, fontSize: '0.92rem' }}
+              >
+                {placingOrder ? 'Sending Order...' : 'Confirm & Order 🚀'}
+              </button>
+            </div>
+
           </div>
         </div>
       )}
