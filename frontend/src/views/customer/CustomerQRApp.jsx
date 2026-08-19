@@ -7,7 +7,7 @@ import {
   CheckCircle2, Clock, UtensilsCrossed, Phone, 
   User, Lock, ArrowRight, X, Sparkles, ChefHat, 
   Bell, CheckCheck, RefreshCw, LogOut, ShieldCheck,
-  Trash2, ShoppingBag, Receipt
+  Trash2, ShoppingBag, Receipt, MapPin
 } from 'lucide-react';
 
 export const CustomerQRApp = () => {
@@ -436,16 +436,51 @@ export const CustomerQRApp = () => {
             </div>
           </div>
 
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.22)',
-            padding: '0.3rem 0.65rem',
-            borderRadius: '9999px',
-            fontSize: '0.78rem',
-            fontWeight: 800,
-            color: '#fff',
-            whiteSpace: 'nowrap'
-          }}>
-            Table #{tableData?.table_number || tableId}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            {activeOrder && (
+              <button
+                type="button"
+                onClick={() => setCurrentStep(currentStep === 3 ? 2 : 3)}
+                style={{
+                  background: currentStep === 3 ? 'rgba(255, 255, 255, 0.25)' : '#ffffff',
+                  color: currentStep === 3 ? '#ffffff' : '#4f46e5',
+                  border: 'none',
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '9999px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                }}
+              >
+                {currentStep === 3 ? (
+                  <>
+                    <Utensils size={13} />
+                    <span>Menu</span>
+                  </>
+                ) : (
+                  <>
+                    <MapPin size={13} />
+                    <span>Track Order</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.22)',
+              padding: '0.3rem 0.65rem',
+              borderRadius: '9999px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              color: '#fff',
+              whiteSpace: 'nowrap'
+            }}>
+              Table #{tableData?.table_number || tableId}
+            </div>
           </div>
         </div>
       </div>
@@ -558,6 +593,51 @@ export const CustomerQRApp = () => {
         {/* ========================================================================= */}
         {currentStep === 2 && (
           <>
+            {/* Active Order Sticky Quick-Tracking Bar */}
+            {activeOrder && (
+              <div 
+                onClick={() => setCurrentStep(3)} 
+                style={{
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(79, 70, 229, 0.15))',
+                  border: '1.5px solid var(--accent-primary)',
+                  borderRadius: '16px',
+                  padding: '0.75rem 1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.15)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: '#22c55e',
+                    boxShadow: '0 0 10px #22c55e',
+                    animation: 'pulse 1.5s infinite'
+                  }} />
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                      Active Order: #{activeOrder.order_number || activeOrder.id}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 700, textTransform: 'capitalize' }}>
+                      Status: {(activeOrder.status || 'pending').replace('_', ' ')} • Tap to view live progress
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  type="button" 
+                  className="btn btn-primary btn-sm" 
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem', fontWeight: 800, borderRadius: '9999px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <MapPin size={13} /> Track Order
+                </button>
+              </div>
+            )}
+
             {/* Customer Session Profile Strip */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.5rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.8rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-primary)', fontWeight: 700 }}>
