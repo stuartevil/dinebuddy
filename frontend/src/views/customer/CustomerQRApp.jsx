@@ -48,7 +48,6 @@ export const CustomerQRApp = () => {
   // Active Placed Order & Live Tracking State
   const [activeOrder, setActiveOrder] = useState(null);
   const [placingOrder, setPlacingOrder] = useState(false);
-  const [prepSecondsRemaining, setPrepSecondsRemaining] = useState(15 * 60);
   const [billRequested, setBillRequested] = useState(false);
   const [requestingBill, setRequestingBill] = useState(false);
 
@@ -114,19 +113,6 @@ export const CustomerQRApp = () => {
 
     return () => clearInterval(pollInterval);
   }, [currentStep, activeOrder?.id]);
-
-  // Live countdown timer for Estimated Preparation Time
-  useEffect(() => {
-    if (currentStep !== 3 || !activeOrder) return;
-    const status = (activeOrder.status || 'pending').toLowerCase();
-    if (status === 'served') return;
-
-    const timer = setInterval(() => {
-      setPrepSecondsRemaining(prev => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [currentStep, activeOrder?.status]);
 
   const handleRequestBill = async () => {
     setRequestingBill(true);
@@ -778,46 +764,8 @@ export const CustomerQRApp = () => {
 
               </div>
 
-              {/* Estimated Prep Time & Live Kitchen Status Card */}
-              <div style={{ background: 'var(--bg-secondary)', padding: '0.9rem 1.15rem', borderRadius: '16px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)' }}>
-                    <Clock size={20} />
-                  </div>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Estimated Prep Time</div>
-                    <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                      {(() => {
-                        const status = (activeOrder.status || 'pending').toLowerCase();
-                        if (status === 'served') return 'Food Served 🎉';
-                        if (status === 'ready') return 'Ready for Pickup 🔔';
-                        const mins = Math.floor(prepSecondsRemaining / 60);
-                        const secs = prepSecondsRemaining % 60;
-                        return `${mins}m ${secs < 10 ? '0' : ''}${secs}s Remaining`;
-                      })()}
-                    </div>
-                  </div>
-                </div>
-
-                {(() => {
-                  const status = (activeOrder.status || 'pending').toLowerCase();
-                  if (status === 'served') {
-                    return (
-                      <div style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', padding: '0.3rem 0.65rem', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 800 }}>
-                        ✓ Completed
-                      </div>
-                    );
-                  }
-                  return (
-                    <div style={{ background: 'var(--accent-glow)', color: 'var(--accent-primary)', padding: '0.3rem 0.65rem', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 800 }}>
-                      ● Live Kitchen
-                    </div>
-                  );
-                })()}
-              </div>
-
               {/* Status Descriptor Message */}
-              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginTop: '0.75rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginTop: '1.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                 {(() => {
                   const status = (activeOrder.status || 'pending').toLowerCase();
                   if (status === 'served') return `🍽️ All dishes served at Table #${tableData?.table_number || tableId}. Bon Appétit!`;
