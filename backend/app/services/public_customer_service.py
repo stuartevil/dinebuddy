@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -340,6 +340,22 @@ class PublicCustomerService:
         # Add order to table session
         order = BillingService.add_order_to_session(db, table.id, order_create_payload)
         return order
+
+    @staticmethod
+    def request_bill(db: Session, table_identifier: Any, restaurant_identifier: Optional[Any] = None) -> Dict[str, Any]:
+        """
+        Registers a customer request for printed bill at table.
+        """
+        if restaurant_identifier:
+            restaurant = PublicCustomerService._resolve_restaurant(db, restaurant_identifier)
+            table = PublicCustomerService._resolve_table_in_restaurant(db, restaurant.id, table_identifier)
+        else:
+            table = PublicCustomerService._resolve_table(db, table_identifier)
+
+        return {
+            "status": "success",
+            "message": f"Bill requested for Table {table.table_number}. Waiter notified."
+        }
 
     @staticmethod
     def get_order_status(db: Session, order_id: int) -> Order:

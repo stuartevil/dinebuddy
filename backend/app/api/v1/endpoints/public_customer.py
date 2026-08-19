@@ -40,6 +40,18 @@ def place_public_restaurant_table_order(
     return PublicCustomerService.place_restaurant_table_order(db, restaurant_id, table_id, payload)
 
 
+@router.post("/restaurants/{restaurant_id}/tables/{table_id}/request-bill")
+def request_public_restaurant_table_bill(
+    restaurant_id: str,
+    table_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint for customers to request their final printed bill at the table.
+    """
+    return PublicCustomerService.request_bill(db, table_id, restaurant_id)
+
+
 # ============================================================================
 # GLOBAL / SINGLE TABLE QR ENDPOINTS (Backward Compatible: /public/tables/12/...)
 # ============================================================================
@@ -66,6 +78,17 @@ def place_public_customer_order(
     Accepts table_number (e.g. 'OT-01') or database ID.
     """
     return PublicCustomerService.place_order(db, table_id, payload)
+
+
+@router.post("/tables/{table_id}/request-bill")
+def request_public_table_bill(
+    table_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint for customers to request their final printed bill at the table.
+    """
+    return PublicCustomerService.request_bill(db, table_id)
 
 
 @router.get("/tables/orders/{order_id}/status", response_model=OrderResponse)
