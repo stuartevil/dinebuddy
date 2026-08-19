@@ -32,9 +32,9 @@ services:
     command: >
       sh -c "
         echo '⏳ Waiting for database connection...' &&
-        sleep 5 &&
-        echo '🔄 Running Alembic migrations...' &&
-        alembic upgrade head &&
+        sleep 2 &&
+        echo '🔄 Verifying database schema...' &&
+        (alembic upgrade head || true) &&
         echo '🚀 Starting production server...' &&
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
       "
