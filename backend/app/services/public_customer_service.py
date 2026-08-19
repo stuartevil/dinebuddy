@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 
 from app.models.restaurant_table import RestaurantTable
 from app.models.restaurant import Restaurant
+from app.models.restaurant_settings import RestaurantSettings
 from app.models.menu_category import MenuCategory
 from app.models.menu_items import MenuItem
 from app.models.customer import Customer
@@ -137,6 +138,9 @@ class PublicCustomerService:
             .all()
         )
 
+        settings = db.query(RestaurantSettings).filter(RestaurantSettings.restaurant_id == restaurant.id).first()
+        tax_pct = float(settings.tax_percentage) if (settings and settings.tax_percentage is not None) else 5.0
+
         return {
             "table": {
                 "id": table.id,
@@ -151,6 +155,7 @@ class PublicCustomerService:
                 "logo_url": restaurant.logo_url,
                 "address": restaurant.address,
                 "phone": restaurant.phone,
+                "tax_percentage": tax_pct,
             },
             "categories": [
                 {
@@ -207,6 +212,9 @@ class PublicCustomerService:
             .all()
         )
 
+        settings = db.query(RestaurantSettings).filter(RestaurantSettings.restaurant_id == restaurant.id).first()
+        tax_pct = float(settings.tax_percentage) if (settings and settings.tax_percentage is not None) else 5.0
+
         return {
             "table": {
                 "id": table.id,
@@ -221,6 +229,7 @@ class PublicCustomerService:
                 "logo_url": restaurant.logo_url,
                 "address": restaurant.address,
                 "phone": restaurant.phone,
+                "tax_percentage": tax_pct,
             },
             "categories": [
                 {

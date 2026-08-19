@@ -16,6 +16,7 @@ class PublicRestaurantSchema(BaseModel):
     logo_url: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None
+    tax_percentage: Optional[float] = 5.0
 
 
 class PublicCategorySchema(BaseModel):

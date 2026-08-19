@@ -300,8 +300,12 @@ export const CustomerQRApp = () => {
     setCart(prev => prev.filter(i => (i.cartItemId || i.id) !== cartItemId));
   };
 
+  const taxRate = restaurantData?.tax_percentage !== undefined && restaurantData?.tax_percentage !== null
+    ? parseFloat(restaurantData.tax_percentage)
+    : 5.0;
+
   const subtotal = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
-  const gst = subtotal * 0.05;
+  const gst = Math.round((subtotal * (taxRate / 100)) * 100) / 100;
   const total = subtotal + gst;
 
   // Auto-close review modal if cart becomes empty
@@ -816,7 +820,7 @@ export const CustomerQRApp = () => {
               <div style={{ fontWeight: 800, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <ShoppingCart size={18} /> {cart.reduce((s, i) => s + i.qty, 0)} Items Selected
               </div>
-              <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Total: ₹{total.toFixed(2)} (incl. tax)</span>
+              <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Total: ₹{total.toFixed(2)} (incl. {taxRate}% tax)</span>
             </div>
 
             <button 
@@ -965,7 +969,7 @@ export const CustomerQRApp = () => {
                 <span>₹{subtotal.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>Taxes & GST (5%)</span>
+                <span>Taxes & GST ({taxRate}%)</span>
                 <span>₹{gst.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.98rem', color: 'var(--text-primary)', paddingTop: '0.4rem', borderTop: '1px solid var(--border-color)', marginTop: '0.2rem' }}>
