@@ -21,8 +21,11 @@ export const CustomerQRApp = () => {
   const [loading, setLoading] = useState(true);
   const [logoError, setLogoError] = useState(false);
 
+  // Toggle to bypass Firebase SMS OTP for testing/development (Set to false to re-enable strict OTP)
+  const BYPASS_FIREBASE_OTP = true;
+
   // Step state: 1 = Welcome & Login, 2 = Menu & Cart, 3 = Order Tracking
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(BYPASS_FIREBASE_OTP ? 2 : 1);
 
   // Customer Login & Firebase State
   const [customerName, setCustomerName] = useState('');
@@ -126,6 +129,18 @@ export const CustomerQRApp = () => {
   const handleRequestFirebaseOtp = async (e) => {
     e.preventDefault();
     setAuthError('');
+
+    // If OTP is bypassed for testing, directly save session and proceed to menu
+    if (BYPASS_FIREBASE_OTP) {
+      const sessionData = { 
+        name: customerName.trim() || 'Guest Diner', 
+        phone: customerPhone.trim() || '9999999999' 
+      };
+      sessionStorage.setItem(sessionKey, JSON.stringify(sessionData));
+      setCurrentStep(2);
+      return;
+    }
+
     const cleanPhone = customerPhone.replace(/\D/g, '');
 
     if (cleanPhone.length < 10) {
@@ -200,7 +215,7 @@ export const CustomerQRApp = () => {
     setCustomerPhone('');
     setOtpSent(false);
     setConfirmationResult(null);
-    setCurrentStep(1);
+    setCurrentStep(BYPASS_FIREBASE_OTP ? 2 : 1);
   };
 
   const handleDishClick = async (dish) => {
@@ -294,8 +309,8 @@ export const CustomerQRApp = () => {
         quantity: i.qty,
         special_instructions: specialInstructions[i.id] || null
       })),
-      phone: customerPhone ? customerPhone.trim() : null,
-      name: customerName ? customerName.trim() : null
+      phone: customerPhone ? customerPhone.trim() : '9999999999',
+      name: customerName ? customerName.trim() : 'Guest Diner'
     };
 
     try {
@@ -511,12 +526,12 @@ export const CustomerQRApp = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.5rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.8rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-primary)', fontWeight: 700 }}>
                 <User size={14} color="var(--accent-primary)" />
-                <span>{customerName || 'Verified Diner'}</span>
-                <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({customerPhone})</span>
+                <span>{customerName || 'Guest Diner'}</span>
+                {customerPhone && <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({customerPhone})</span>}
               </div>
 
-              <button onClick={handleCustomerLogout} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', fontWeight: 600 }}>
-                <LogOut size={12} /> Change
+              <button onClick={handleCustomerLogout} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', fontWeight: 600 }}>
+                <User size={12} /> {customerName ? 'Change' : 'Set Name'}
               </button>
             </div>
 
