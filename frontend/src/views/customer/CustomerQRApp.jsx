@@ -4,12 +4,12 @@ import { api, getMediaUrl } from '../../services/apiClient';
 import { auth, RecaptchaVerifier, signInWithPhoneNumber } from '../../services/firebase';
 import {
   Utensils, Search, Plus, Minus, ShoppingCart,
-  CheckCircle2, Clock, UtensilsCrossed, Phone,
-  User, Lock, ArrowRight, X, Sparkles, ChefHat,
-  Bell, CheckCheck, RefreshCw, LogOut, ShieldCheck,
-  Trash2, ShoppingBag, Receipt, MapPin
+  CheckCircle2, Clock, UtensilsCrossed,
+  User, Lock, X, ChefHat,
+  Bell, CheckCheck, ShieldCheck,
+  Trash2, Receipt, MapPin
 } from 'lucide-react';
-import { formatISTTime, formatFullISTDateTime } from '../../utils/dateUtils';
+import { formatISTTime } from '../../utils/dateUtils';
 
 export const CustomerQRApp = () => {
   const { tableId = '1', restaurantId } = useParams();
