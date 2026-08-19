@@ -192,72 +192,7 @@ class PublicCustomerService:
         Supports lookup by table_number (e.g. OT-01) or table_id.
         """
         table = PublicCustomerService._resolve_table(db, table_identifier)
-
-        restaurant = db.query(Restaurant).filter(Restaurant.id == table.restaurant_id).first()
-        if not restaurant:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Restaurant not found."
-            )
-
-        categories = (
-            db.query(MenuCategory)
-            .filter(
-                (MenuCategory.restaurant_id == restaurant.id) | (MenuCategory.is_global == True)
-            )
-            .all()
-        )
-
-        items = (
-            db.query(MenuItem)
-            .filter(
-                MenuItem.restaurant_id == restaurant.id,
-                MenuItem.is_available == True
-            )
-            .all()
-        )
-
-        settings = db.query(RestaurantSettings).filter(RestaurantSettings.restaurant_id == restaurant.id).first()
-        tax_pct = float(settings.tax_percentage) if (settings and settings.tax_percentage is not None) else 5.0
-
-        return {
-            "table": {
-                "id": table.id,
-                "table_number": table.table_number,
-                "capacity": table.capacity,
-                "status": str(table.status.value if hasattr(table.status, "value") else table.status),
-                "restaurant_id": table.restaurant_id,
-            },
-            "restaurant": {
-                "id": restaurant.id,
-                "name": restaurant.name,
-                "logo_url": restaurant.logo_url,
-                "address": restaurant.address,
-                "phone": restaurant.phone,
-                "tax_percentage": tax_pct,
-            },
-            "categories": [
-                {
-                    "id": c.id,
-                    "name": c.name,
-                    "description": c.description,
-                    "is_global": c.is_global,
-                }
-                for c in categories
-            ],
-            "menu_items": [
-                {
-                    "id": i.id,
-                    "name": i.name,
-                    "description": i.description,
-                    "price": float(i.price) if i.price else 0.0,
-                    "image_url": i.image_url,
-                    "is_veg": bool(getattr(i, "is_vegetarian", False)),
-                    "category_id": i.category_id,
-                }
-                for i in items
-            ]
-        }
+        return PublicCustomerService.get_restaurant_table_and_menu_info(db, table.restaurant_id, table.id)
 
     @staticmethod
     def check_customer_status(
@@ -483,86 +418,21 @@ class PublicCustomerService:
         Supports lookup by table_number (e.g. OT-01) or table_id.
         """
         table = PublicCustomerService._resolve_table(db, table_identifier)
-
-        customer_id = None
-        if payload.phone:
-            clean_phone = "".join(filter(str.isdigit, str(payload.phone)))
-            if len(clean_phone) > 10 and clean_phone.startswith("91"):
-                clean_phone = clean_phone[-10:]
-
-            clean_name = payload.name.strip() if payload.name else None
-
-            customer = db.query(Customer).filter(Customer.phone == clean_phone).first()
-            if not customer:
-                customer = Customer(
-                    phone=clean_phone,
-                    name=clean_name,
-                    total_orders=1
-                )
-                db.add(customer)
-                db.commit()
-                db.refresh(customer)
-            else:
-                if clean_name:
-                    customer.name = clean_name
-                customer.total_orders = (customer.total_orders or 0) + 1
-                customer.last_order_at = datetime.utcnow()
-                db.commit()
-            customer_id = customer.id
-
-            # Restaurant-specific tracking
-            rc = db.query(RestaurantCustomer).filter(
-                RestaurantCustomer.restaurant_id == table.restaurant_id,
-                RestaurantCustomer.phone == clean_phone
-            ).first()
-
-            if not rc:
-                rc = RestaurantCustomer(
-                    restaurant_id=table.restaurant_id,
-                    customer_id=customer.id,
-                    phone=clean_phone,
-                    name=clean_name or customer.name,
-                    is_verified=True,
-                    visit_count=1,
-                    last_visit_at=datetime.utcnow()
-                )
-                db.add(rc)
-                db.commit()
-            else:
-                rc.visit_count = (rc.visit_count or 0) + 1
-                rc.last_visit_at = datetime.utcnow()
-                if clean_name:
-                    rc.name = clean_name
-                db.commit()
-
-        # Open table session with customer_id attached
-        session = BillingService.open_table_session(db, table.id, customer_id=customer_id)
-        if customer_id and not session.customer_id:
-            session.customer_id = customer_id
-            db.commit()
-
-        items_dict = [item.dict() for item in payload.items]
-        order_create_payload = OrderCreate(items=items_dict)
-
-        # Add order to table session
-        order = BillingService.add_order_to_session(db, table.id, order_create_payload)
-        return order
+        return PublicCustomerService.place_restaurant_table_order(db, table.restaurant_id, table.id, payload)
 
     @staticmethod
     def request_bill(db: Session, table_identifier: Any, restaurant_identifier: Optional[Any] = None) -> Dict[str, Any]:
         """
         Registers a customer request for printed bill at table.
         """
-        if restaurant_identifier:
-            restaurant = PublicCustomerService._resolve_restaurant(db, restaurant_identifier)
-            table = PublicCustomerService._resolve_table_in_restaurant(db, restaurant.id, table_identifier)
-        else:
-            table = PublicCustomerService._resolve_table(db, table_identifier)
-
-        return {
-            "status": "success",
-            "message": f"Bill requested for Table {table.table_number}. Waiter notified."
-        }
+        table = (
+            PublicCustomerService._resolve_table_in_restaurant(
+                db, PublicCustomerService._resolve_restaurant(db, restaurant_identifier).id, table_identifier
+            )
+            if restaurant_identifier
+            else PublicCustomerService._resolve_table(db, table_identifier)
+        )
+        return {"status": "success", "message": f"Bill requested for Table {table.table_number}. Waiter notified."}
 
     @staticmethod
     def get_order_status(db: Session, order_id: int) -> Order:
