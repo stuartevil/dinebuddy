@@ -484,91 +484,101 @@ export const TableManagement = () => {
               </button>
             </div>
 
-            <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '16px', display: 'inline-block', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', marginBottom: '1.25rem' }}>
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`${window.location.origin}/order/table/${qrModalTable.id}`)}`}
-                alt={`Table ${qrModalTable.table_number} QR Code`}
-                style={{ width: '180px', height: '180px', display: 'block', margin: '0 auto' }}
-              />
-              <div style={{ marginTop: '0.75rem', color: '#1e293b', fontWeight: 800, fontSize: '1.1rem' }}>
-                {selectedRestaurant?.name || 'DineBuddy'}
-              </div>
-              <div style={{ color: '#6366f1', fontWeight: 800, fontSize: '1.3rem' }}>
-                {qrModalTable.table_number}
-              </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
-                Scan to View Menu & Order
-              </div>
-            </div>
+            {(() => {
+              const tableSlug = qrModalTable.table_number || qrModalTable.id;
+              const tableOrderUrl = `${window.location.origin}/order/table/${encodeURIComponent(tableSlug)}`;
+              const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(tableOrderUrl)}`;
+              const qrPrintUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(tableOrderUrl)}`;
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <button
-                onClick={() => {
-                  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}/order/table/${qrModalTable.id}`)}`;
-                  const restName = selectedRestaurant?.name || 'DineBuddy Restaurant';
-                  const printWindow = window.open('', '_blank', 'width=600,height=700');
-                  printWindow.document.write(`
-                    <!DOCTYPE html>
-                    <html>
-                      <head>
-                        <title>Print QR Sticker - ${qrModalTable.table_number}</title>
-                        <style>
-                          body { font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f8fafc; }
-                          .sticker-card { background: white; padding: 2.5rem; border-radius: 24px; text-align: center; border: 3px solid #6366f1; box-shadow: 0 20px 40px rgba(0,0,0,0.1); width: 320px; }
-                          .logo { font-size: 1.4rem; font-weight: 800; color: #1e293b; margin-bottom: 0.25rem; }
-                          .sub { font-size: 0.8rem; color: #64748b; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
-                          .qr-img { width: 220px; height: 220px; border-radius: 16px; margin: 0 auto 1.25rem auto; display: block; border: 1px solid #e2e8f0; }
-                          .table-title { font-size: 2rem; font-weight: 900; color: #6366f1; margin-bottom: 0.25rem; }
-                          .scan-text { font-size: 0.85rem; font-weight: 700; color: #475569; }
-                          @media print {
-                            body { background: white; }
-                            .sticker-card { border: 2px solid #000; box-shadow: none; }
-                          }
-                        </style>
-                      </head>
-                      <body>
-                        <div class="sticker-card">
-                          <div class="logo">${restName}</div>
-                          <div class="sub">SCAN TO ORDER FOOD</div>
-                          <img src="${qrUrl}" class="qr-img" />
-                          <div class="table-title">${qrModalTable.table_number}</div>
-                          <div class="scan-text">Point phone camera to view menu & order</div>
-                        </div>
-                        <script>
-                          setTimeout(() => { window.print(); }, 600);
-                        </script>
-                      </body>
-                    </html>
-                  `);
-                  printWindow.document.close();
-                }}
-                className="btn btn-primary"
-                style={{ width: '100%' }}
-              >
-                🖨️ Print / Save QR Sticker (PDF)
-              </button>
+              return (
+                <>
+                  <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '16px', display: 'inline-block', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', marginBottom: '1.25rem' }}>
+                    <img
+                      src={qrImgUrl}
+                      alt={`Table ${qrModalTable.table_number} QR Code`}
+                      style={{ width: '180px', height: '180px', display: 'block', margin: '0 auto' }}
+                    />
+                    <div style={{ marginTop: '0.75rem', color: '#1e293b', fontWeight: 800, fontSize: '1.1rem' }}>
+                      {selectedRestaurant?.name || 'DineBuddy'}
+                    </div>
+                    <div style={{ color: '#6366f1', fontWeight: 800, fontSize: '1.3rem' }}>
+                      {qrModalTable.table_number}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                      Scan to View Menu & Order
+                    </div>
+                  </div>
 
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/order/table/${qrModalTable.id}`);
-                  addToast('success', 'Link Copied', 'Customer menu link copied to clipboard!');
-                }}
-                className="btn btn-secondary"
-                style={{ width: '100%' }}
-              >
-                📋 Copy Customer Menu Link
-              </button>
-              
-              <a
-                href={`${window.location.origin}/order/table/${qrModalTable.id}`}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-secondary"
-                style={{ width: '100%', textDecoration: 'none', textAlign: 'center' }}
-              >
-                🌐 Test Customer Menu in New Tab
-              </a>
-            </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <button
+                      onClick={() => {
+                        const restName = selectedRestaurant?.name || 'DineBuddy Restaurant';
+                        const printWindow = window.open('', '_blank', 'width=600,height=700');
+                        printWindow.document.write(`
+                          <!DOCTYPE html>
+                          <html>
+                            <head>
+                              <title>Print QR Sticker - ${qrModalTable.table_number}</title>
+                              <style>
+                                body { font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f8fafc; }
+                                .sticker-card { background: white; padding: 2.5rem; border-radius: 24px; text-align: center; border: 3px solid #6366f1; box-shadow: 0 20px 40px rgba(0,0,0,0.1); width: 320px; }
+                                .logo { font-size: 1.4rem; font-weight: 800; color: #1e293b; margin-bottom: 0.25rem; }
+                                .sub { font-size: 0.8rem; color: #64748b; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+                                .qr-img { width: 220px; height: 220px; border-radius: 16px; margin: 0 auto 1.25rem auto; display: block; border: 1px solid #e2e8f0; }
+                                .table-title { font-size: 2rem; font-weight: 900; color: #6366f1; margin-bottom: 0.25rem; }
+                                .scan-text { font-size: 0.85rem; font-weight: 700; color: #475569; }
+                                @media print {
+                                  body { background: white; }
+                                  .sticker-card { border: 2px solid #000; box-shadow: none; }
+                                }
+                              </style>
+                            </head>
+                            <body>
+                              <div class="sticker-card">
+                                <div class="logo">${restName}</div>
+                                <div class="sub">SCAN TO ORDER FOOD</div>
+                                <img src="${qrPrintUrl}" class="qr-img" />
+                                <div class="table-title">${qrModalTable.table_number}</div>
+                                <div class="scan-text">Point phone camera to view menu & order</div>
+                              </div>
+                              <script>
+                                setTimeout(() => { window.print(); }, 600);
+                              </script>
+                            </body>
+                          </html>
+                        `);
+                        printWindow.document.close();
+                      }}
+                      className="btn btn-primary"
+                      style={{ width: '100%' }}
+                    >
+                      🖨️ Print / Save QR Sticker (PDF)
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(tableOrderUrl);
+                        addToast('success', 'Link Copied', `Customer menu link for ${qrModalTable.table_number} copied!`);
+                      }}
+                      className="btn btn-secondary"
+                      style={{ width: '100%' }}
+                    >
+                      📋 Copy Customer Menu Link
+                    </button>
+                    
+                    <a
+                      href={tableOrderUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-secondary"
+                      style={{ width: '100%', textDecoration: 'none', textAlign: 'center' }}
+                    >
+                      🌐 Test Customer Menu in New Tab ({qrModalTable.table_number})
+                    </a>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

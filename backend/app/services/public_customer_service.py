@@ -16,16 +16,40 @@ from app.services.billing_service import BillingService
 class PublicCustomerService:
 
     @staticmethod
-    def get_table_and_menu_info(db: Session, table_id: int) -> Dict[str, Any]:
+    def _resolve_table(db: Session, table_identifier: Any) -> RestaurantTable:
+        """
+        Resolves table by table_number (e.g. 'OT-01'), qr_code_token, or integer ID.
+        """
+        ident_str = str(table_identifier).strip()
+
+        # 1. Try finding by table_number (exact or case-insensitive)
+        table = db.query(RestaurantTable).filter(RestaurantTable.table_number.ilike(ident_str)).first()
+        if table:
+            return table
+
+        # 2. Try finding by qr_code_token
+        table = db.query(RestaurantTable).filter(RestaurantTable.qr_code_token == ident_str).first()
+        if table:
+            return table
+
+        # 3. Try finding by integer ID if numeric
+        if ident_str.isdigit():
+            table = db.query(RestaurantTable).filter(RestaurantTable.id == int(ident_str)).first()
+            if table:
+                return table
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Table '{table_identifier}' not found."
+        )
+
+    @staticmethod
+    def get_table_and_menu_info(db: Session, table_identifier: Any) -> Dict[str, Any]:
         """
         Fetches table information, restaurant details, menu categories, and menu items.
+        Supports lookup by table_number (e.g. OT-01) or table_id.
         """
-        table = db.query(RestaurantTable).filter(RestaurantTable.id == table_id).first()
-        if not table:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Table not found."
-            )
+        table = PublicCustomerService._resolve_table(db, table_identifier)
 
         restaurant = db.query(Restaurant).filter(Restaurant.id == table.restaurant_id).first()
         if not restaurant:
@@ -90,16 +114,12 @@ class PublicCustomerService:
         }
 
     @staticmethod
-    def place_order(db: Session, table_id: int, payload: PublicCustomerOrderPayload) -> Order:
+    def place_order(db: Session, table_identifier: Any, payload: PublicCustomerOrderPayload) -> Order:
         """
         Auto-opens table session, registers/links customer phone, and places order.
+        Supports lookup by table_number (e.g. OT-01) or table_id.
         """
-        table = db.query(RestaurantTable).filter(RestaurantTable.id == table_id).first()
-        if not table:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Table not found."
-            )
+        table = PublicCustomerService._resolve_table(db, table_identifier)
 
         customer_id = None
         if payload.phone:

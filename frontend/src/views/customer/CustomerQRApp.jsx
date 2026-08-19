@@ -67,7 +67,7 @@ export const CustomerQRApp = () => {
   // Fetch Table and Menu Details from Backend API
   useEffect(() => {
     setLoading(true);
-    api.get(`/public/tables/${tableId}/info`)
+    api.get(`/public/tables/${encodeURIComponent(tableId)}/info`)
       .then(res => {
         const data = res.data;
         setTableData(data.table);
@@ -76,7 +76,7 @@ export const CustomerQRApp = () => {
         setMenuItems(data.menu_items || []);
       })
       .catch(() => {
-        setTableData({ id: tableId, table_number: `T-${tableId}`, capacity: 4 });
+        setTableData({ id: tableId, table_number: `${tableId}`, capacity: 4 });
         setRestaurantData({ name: 'DineBuddy Gourmet Dining' });
       })
       .finally(() => {
@@ -293,7 +293,7 @@ export const CustomerQRApp = () => {
     };
 
     try {
-      const res = await api.post(`/public/tables/${tableId}/order`, orderPayload);
+      const res = await api.post(`/public/tables/${encodeURIComponent(tableId)}/order`, orderPayload);
       setActiveOrder(res.data);
       setCart([]);
       setCurrentStep(3); // Move to Step 3: Order Tracking
