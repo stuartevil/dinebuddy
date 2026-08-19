@@ -1,0 +1,58 @@
+name: Deploy DineBuddy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Production EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            echo "🚀 Connecting to EC2 server..."
+            
+            # Navigate to project directory or clone if not present
+            if [ ! -d "/home/ubuntu/dinebuddy" ]; then
+              echo "📂 First time setup: Cloning repository..."
+              cd /home/ubuntu
+              git clone https://github.com/stuartevil/dinebuddy.git
+              cd /home/ubuntu/dinebuddy
+            else
+              cd /home/ubuntu/dinebuddy
+              echo "🔄 Pulling latest changes from main branch..."
+              git fetch --all
+              git reset --hard origin/main
+            fi
+
+            # Ensure .env exists with production database connection
+            if [ ! -f ".env" ]; then
+              echo "⚙️ Creating production .env..."
+              cat << 'EOF' > .env
+ENVIRONMENT=production
+PROJECT_NAME=DineBuddy
+DATABASE_URL=postgresql://postgres.iahzjepenwomwvjjtszo:HrXbnu%24%24TmqDV4j@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres
+SECRET_KEY=dinebuddy-production-secret-key-2026-safe
+CORS_ORIGINS=*
+EOF
+            fi
+
+            echo "🐳 Building and starting Docker containers..."
+            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+
+            echo "🧹 Cleaning unused Docker images..."
+            docker image prune -f
+
+            echo "🎉 DineBuddy successfully deployed to EC2!"

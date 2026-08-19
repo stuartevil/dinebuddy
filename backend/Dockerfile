@@ -20,9 +20,10 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install postgresql-client for healthchecks
+# Install postgresql-client and curl for healthchecks
 RUN apt-get update && apt-get install -y \
     postgresql-client \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies from builder
