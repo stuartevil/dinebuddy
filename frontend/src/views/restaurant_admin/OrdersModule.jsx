@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
 import { printKOT, printBill } from '../../services/printService';
 import { Layers, Clock, CheckCircle2, Eye, CreditCard, XCircle, AlertTriangle, X, Printer, Receipt } from 'lucide-react';
+import { formatISTTime } from '../../utils/dateUtils';
 
 export const OrdersModule = () => {
   const { selectedRestaurant, addToast } = useAuth();
@@ -111,7 +112,7 @@ export const OrdersModule = () => {
                 <div>
                   <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>{order.order_number || `ORD-${order.id}`}</span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>
-                    {order.table_number && !order.table_number.toLowerCase().includes('takeaway') ? `Table: ${order.table_number}` : '🥡 Takeaway Order'} • {order.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+                    {order.table_number && !order.table_number.toLowerCase().includes('takeaway') ? `Table: ${order.table_number}` : '🥡 Takeaway Order'} • {order.created_at ? `${formatISTTime(order.created_at)} IST` : 'Now'}
                   </span>
                 </div>
                 <span className={`badge ${

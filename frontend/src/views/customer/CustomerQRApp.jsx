@@ -9,6 +9,7 @@ import {
   Bell, CheckCheck, RefreshCw, LogOut, ShieldCheck,
   Trash2, ShoppingBag, Receipt, MapPin
 } from 'lucide-react';
+import { formatISTTime, formatFullISTDateTime } from '../../utils/dateUtils';
 
 export const CustomerQRApp = () => {
   const { tableId = '1', restaurantId } = useParams();
@@ -353,7 +354,11 @@ export const CustomerQRApp = () => {
         : `/public/tables/${encodeURIComponent(tableId)}/order`;
 
       const res = await api.post(orderUrl, orderPayload);
-      setActiveOrder(res.data);
+      const orderWithTime = {
+        ...res.data,
+        created_at: res.data?.created_at || new Date().toISOString()
+      };
+      setActiveOrder(orderWithTime);
       setCart([]);
       setShowReviewModal(false);
       setCurrentStep(3); // Move to Step 3: Order Tracking
@@ -362,6 +367,7 @@ export const CustomerQRApp = () => {
         id: Math.floor(1000 + Math.random() * 9000),
         order_number: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
         status: 'pending',
+        created_at: new Date().toISOString(),
         items: cart.map(i => ({
           id: i.id,
           name: i.name,
@@ -620,7 +626,7 @@ export const CustomerQRApp = () => {
                   }} />
                   <div>
                     <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                      Active Order: #{activeOrder.order_number || activeOrder.id}
+                      Active Order: #{activeOrder.order_number || activeOrder.id} • {formatISTTime(activeOrder.created_at)} IST
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 700, textTransform: 'capitalize' }}>
                       Status: {(activeOrder.status || 'pending').replace('_', ' ')} • Tap to view live progress
@@ -765,8 +771,14 @@ export const CustomerQRApp = () => {
             
             {/* Ticket Header Card */}
             <div className="panel-card" style={{ padding: '1.5rem 1.25rem', borderRadius: 'var(--radius-xl)', textAlign: 'center' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'var(--accent-glow)', color: 'var(--accent-primary)', padding: '0.3rem 0.85rem', borderRadius: '9999px', fontSize: '0.78rem', fontWeight: 800, marginBottom: '0.75rem' }}>
-                Ticket #{activeOrder.order_number || 'ORD-98421'}
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                <div style={{ background: 'var(--accent-glow)', color: 'var(--accent-primary)', padding: '0.3rem 0.85rem', borderRadius: '9999px', fontSize: '0.78rem', fontWeight: 800 }}>
+                  Ticket #{activeOrder.order_number || 'ORD-98421'}
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Clock size={12} color="var(--accent-primary)" />
+                  <span>{formatISTTime(activeOrder.created_at)} IST</span>
+                </div>
               </div>
 
               <h3 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Live Order Tracking</h3>
@@ -858,9 +870,14 @@ export const CustomerQRApp = () => {
 
             {/* Ordered Items Summary */}
             <div className="panel-card" style={{ padding: '1.25rem', borderRadius: 'var(--radius-xl)' }}>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                Order Items Summary
-              </h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, margin: 0 }}>
+                  Order Items Summary
+                </h4>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  🕒 {formatISTTime(activeOrder.created_at)} (IST)
+                </span>
+              </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {(activeOrder.items || []).map((item, idx) => {

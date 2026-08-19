@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
 import { printKOT } from '../../services/printService';
 import { MonitorPlay, Clock, CheckCircle2, Play, Printer } from 'lucide-react';
+import { formatISTTime } from '../../utils/dateUtils';
 
 export const KDSView = () => {
   const { selectedRestaurant, addToast } = useAuth();
@@ -74,7 +75,7 @@ export const KDSView = () => {
               <div key={order.id} className="panel-card" style={{ padding: '1rem', borderLeft: '4px solid var(--warning)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.1rem' }}>
                   <span>{order.table_number && !order.table_number.toLowerCase().includes('takeaway') ? `Table ${order.table_number}` : '🥡 TAKEAWAY'}</span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.created_at ? `${formatISTTime(order.created_at)} IST` : 'Now'}</span>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Ticket {order.order_number || `ORD-${order.id}`}</div>
 
@@ -114,7 +115,7 @@ export const KDSView = () => {
               <div key={order.id} className="panel-card" style={{ padding: '1rem', borderLeft: '4px solid var(--accent-primary)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.1rem' }}>
                   <span>{order.table_number && !order.table_number.toLowerCase().includes('takeaway') ? `Table ${order.table_number}` : '🥡 TAKEAWAY'}</span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.created_at ? `${formatISTTime(order.created_at)} IST` : 'Now'}</span>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Ticket {order.order_number || `ORD-${order.id}`}</div>
 
