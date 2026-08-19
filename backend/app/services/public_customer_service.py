@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, Any
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
@@ -12,20 +13,28 @@ from app.schemas.order import OrderCreate
 from app.schemas.public_customer_schema import PublicCustomerOrderPayload
 from app.services.billing_service import BillingService
 
+logger = logging.getLogger(__name__)
+
 
 class PublicCustomerService:
 
     @staticmethod
     def _resolve_restaurant(db: Session, restaurant_identifier: Any) -> Restaurant:
         """
-        Resolves restaurant by ID or name.
+        Resolves restaurant by integer ID or slug/name.
         """
         ident_str = str(restaurant_identifier).strip()
         restaurant = None
+
         if ident_str.isdigit():
             restaurant = db.query(Restaurant).filter(Restaurant.id == int(ident_str)).first()
+
+        if not restaurant:
+            restaurant = db.query(Restaurant).filter(Restaurant.slug == ident_str).first()
+
         if not restaurant:
             restaurant = db.query(Restaurant).filter(Restaurant.name.ilike(ident_str)).first()
+
         if not restaurant:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -133,7 +142,7 @@ class PublicCustomerService:
                 "id": table.id,
                 "table_number": table.table_number,
                 "capacity": table.capacity,
-                "status": table.status,
+                "status": str(table.status.value if hasattr(table.status, "value") else table.status),
                 "restaurant_id": table.restaurant_id,
             },
             "restaurant": {
@@ -159,7 +168,7 @@ class PublicCustomerService:
                     "description": i.description,
                     "price": float(i.price) if i.price else 0.0,
                     "image_url": i.image_url,
-                    "is_veg": i.is_veg,
+                    "is_veg": bool(getattr(i, "is_vegetarian", False)),
                     "category_id": i.category_id,
                 }
                 for i in items
@@ -203,7 +212,7 @@ class PublicCustomerService:
                 "id": table.id,
                 "table_number": table.table_number,
                 "capacity": table.capacity,
-                "status": table.status,
+                "status": str(table.status.value if hasattr(table.status, "value") else table.status),
                 "restaurant_id": table.restaurant_id,
             },
             "restaurant": {
@@ -229,7 +238,7 @@ class PublicCustomerService:
                     "description": i.description,
                     "price": float(i.price) if i.price else 0.0,
                     "image_url": i.image_url,
-                    "is_veg": i.is_veg,
+                    "is_veg": bool(getattr(i, "is_vegetarian", False)),
                     "category_id": i.category_id,
                 }
                 for i in items
