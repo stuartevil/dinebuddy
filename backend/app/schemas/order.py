@@ -15,6 +15,7 @@ class OrderItemResponse(BaseModel):
     id: int
     order_id: int
     menu_item_id: int
+    name: Optional[str] = None
     variant_id: Optional[int] = None
     quantity: int
     unit_price: float

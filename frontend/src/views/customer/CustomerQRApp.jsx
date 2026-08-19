@@ -735,15 +735,30 @@ export const CustomerQRApp = () => {
                 Order Items Summary
               </h4>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                {(activeOrder.items || []).map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <div>
-                      <span style={{ fontWeight: 700 }}>{item.quantity}x</span> {item.name || `Item #${item.menu_item_id}`}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {(activeOrder.items || []).map((item, idx) => {
+                  const resolvedName = item.name 
+                    || item.menu_item_name 
+                    || menuItems.find(m => m.id === (item.menu_item_id || item.id))?.name 
+                    || `Dish #${item.menu_item_id || idx + 1}`;
+                  
+                  const itemPrice = item.total_price 
+                    || (item.unit_price ? item.unit_price * item.quantity : 0)
+                    || (item.price ? item.price * (item.quantity || item.qty || 1) : 0);
+
+                  return (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.88rem', padding: '0.35rem 0', borderBottom: idx !== (activeOrder.items.length - 1) ? '1px dashed var(--border-color)' : 'none' }}>
+                      <div>
+                        <span style={{ fontWeight: 800, color: 'var(--accent-primary)', marginRight: '0.4rem' }}>{item.quantity || item.qty || 1}x</span> 
+                        <span style={{ fontWeight: 600 }}>{resolvedName}</span>
+                        {item.special_instructions && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>Note: {item.special_instructions}</div>
+                        )}
+                      </div>
+                      <span style={{ fontWeight: 700, whiteSpace: 'nowrap', marginLeft: '0.5rem' }}>₹{itemPrice.toFixed(2)}</span>
                     </div>
-                    <span style={{ fontWeight: 700 }}>₹{(item.total_price || (item.unit_price * item.quantity) || 0).toFixed(2)}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '0.85rem', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1rem', color: 'var(--accent-primary)' }}>

@@ -23,6 +23,11 @@ class OrderItem(Base, IDMixin, TimestampMixin):
 
     # Relationships
     order = relationship("Order", back_populates="items")
+    menu_item = relationship("MenuItem", foreign_keys=[menu_item_id])
+
+    @property
+    def name(self) -> str:
+        return self.menu_item.name if self.menu_item else f"Item #{self.menu_item_id}"
 
     def __repr__(self):
         return f"<OrderItem Item: {self.menu_item_id}, Qty: {self.quantity}, Price: {self.total_price}>"
