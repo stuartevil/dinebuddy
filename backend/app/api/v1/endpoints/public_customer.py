@@ -6,10 +6,45 @@ from app.schemas.public_customer_schema import PublicCustomerOrderPayload, Publi
 from app.schemas.order import OrderResponse
 from app.services.public_customer_service import PublicCustomerService
 
-router = APIRouter(prefix="/public/tables", tags=["Public Customer QR"])
+router = APIRouter(prefix="/public", tags=["Public Customer QR"])
 
 
-@router.get("/{table_id}/info", response_model=PublicTableInfoResponse)
+# ============================================================================
+# RESTAURANT-SCOPED TABLE QR ENDPOINTS (Recommended: /public/restaurants/1/tables/OT-01/...)
+# ============================================================================
+
+@router.get("/restaurants/{restaurant_id}/tables/{table_id}/info", response_model=PublicTableInfoResponse)
+def get_public_restaurant_table_and_menu(
+    restaurant_id: str,
+    table_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint for customers scanning a specific restaurant table QR code.
+    Returns restaurant details, specific table info, and only that restaurant's menu.
+    """
+    return PublicCustomerService.get_restaurant_table_and_menu_info(db, restaurant_id, table_id)
+
+
+@router.post("/restaurants/{restaurant_id}/tables/{table_id}/order", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+def place_public_restaurant_table_order(
+    restaurant_id: str,
+    table_id: str,
+    payload: PublicCustomerOrderPayload,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint to place food order from a specific restaurant table QR code.
+    Auto-opens table session, links customer phone (if provided), and transmits order to POS/Kitchen KDS.
+    """
+    return PublicCustomerService.place_restaurant_table_order(db, restaurant_id, table_id, payload)
+
+
+# ============================================================================
+# GLOBAL / SINGLE TABLE QR ENDPOINTS (Backward Compatible: /public/tables/12/...)
+# ============================================================================
+
+@router.get("/tables/{table_id}/info", response_model=PublicTableInfoResponse)
 def get_public_table_and_menu(table_id: str, db: Session = Depends(get_db)):
     """
     Public endpoint for customers scanning a table QR code.
@@ -19,7 +54,7 @@ def get_public_table_and_menu(table_id: str, db: Session = Depends(get_db)):
     return PublicCustomerService.get_table_and_menu_info(db, table_id)
 
 
-@router.post("/{table_id}/order", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/tables/{table_id}/order", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def place_public_customer_order(
     table_id: str,
     payload: PublicCustomerOrderPayload,
@@ -33,6 +68,7 @@ def place_public_customer_order(
     return PublicCustomerService.place_order(db, table_id, payload)
 
 
+@router.get("/tables/orders/{order_id}/status", response_model=OrderResponse)
 @router.get("/orders/{order_id}/status", response_model=OrderResponse)
 def get_public_order_status(order_id: int, db: Session = Depends(get_db)):
     """

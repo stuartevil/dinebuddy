@@ -33,12 +33,18 @@ const ShellContent = () => {
   const location = useLocation();
 
   // Public routes check (Customer QR Menu)
-  const isCustomerPublicRoute = location.pathname.startsWith('/order/table/') || location.pathname.startsWith('/menu/');
+  const isCustomerPublicRoute = 
+    location.pathname.startsWith('/order/') || 
+    location.pathname.startsWith('/menu/');
 
   if (isCustomerPublicRoute) {
     return (
       <Routes>
+        <Route path="/order/restaurant/:restaurantId/table/:tableId" element={<CustomerQRApp />} />
+        <Route path="/order/r/:restaurantId/t/:tableId" element={<CustomerQRApp />} />
         <Route path="/order/table/:tableId" element={<CustomerQRApp />} />
+        <Route path="/menu/restaurant/:restaurantId/table/:tableId" element={<CustomerQRApp />} />
+        <Route path="/menu/r/:restaurantId/t/:tableId" element={<CustomerQRApp />} />
         <Route path="/menu/:tableId" element={<CustomerQRApp />} />
       </Routes>
     );

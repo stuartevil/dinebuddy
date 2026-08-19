@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 
 export const CustomerQRApp = () => {
-  const { tableId = '1' } = useParams();
+  const { tableId = '1', restaurantId } = useParams();
+  const sessionKey = restaurantId ? `dinebuddy_customer_r_${restaurantId}_t_${tableId}` : `dinebuddy_customer_table_${tableId}`;
 
   // Table & Restaurant Data
   const [tableData, setTableData] = useState(null);
@@ -51,7 +52,7 @@ export const CustomerQRApp = () => {
 
   // Load stored customer session if present
   useEffect(() => {
-    const savedCustomer = sessionStorage.getItem(`dinebuddy_customer_table_${tableId}`);
+    const savedCustomer = sessionStorage.getItem(sessionKey);
     if (savedCustomer) {
       try {
         const parsed = JSON.parse(savedCustomer);
@@ -59,15 +60,19 @@ export const CustomerQRApp = () => {
         setCustomerPhone(parsed.phone || '');
         setCurrentStep(2);
       } catch {
-        sessionStorage.removeItem(`dinebuddy_customer_table_${tableId}`);
+        sessionStorage.removeItem(sessionKey);
       }
     }
-  }, [tableId]);
+  }, [sessionKey]);
 
   // Fetch Table and Menu Details from Backend API
   useEffect(() => {
     setLoading(true);
-    api.get(`/public/tables/${encodeURIComponent(tableId)}/info`)
+    const tableInfoUrl = restaurantId
+      ? `/public/restaurants/${encodeURIComponent(restaurantId)}/tables/${encodeURIComponent(tableId)}/info`
+      : `/public/tables/${encodeURIComponent(tableId)}/info`;
+
+    api.get(tableInfoUrl)
       .then(res => {
         const data = res.data;
         setTableData(data.table);
@@ -75,14 +80,15 @@ export const CustomerQRApp = () => {
         setCategories(data.categories || []);
         setMenuItems(data.menu_items || []);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.warn("Failed to fetch menu info:", err);
         setTableData({ id: tableId, table_number: `${tableId}`, capacity: 4 });
-        setRestaurantData({ name: 'DineBuddy Gourmet Dining' });
+        setRestaurantData({ name: 'Restaurant Menu' });
       })
       .finally(() => {
         setLoading(false);
       });
-  }, [tableId]);
+  }, [tableId, restaurantId]);
 
   // Polling active order status from backend when tracking screen is open
   useEffect(() => {
@@ -178,7 +184,7 @@ export const CustomerQRApp = () => {
     try {
       await confirmationResult.confirm(otpCode.trim());
       const sessionData = { name: customerName.trim(), phone: customerPhone.trim() };
-      sessionStorage.setItem(`dinebuddy_customer_table_${tableId}`, JSON.stringify(sessionData));
+      sessionStorage.setItem(sessionKey, JSON.stringify(sessionData));
       setCurrentStep(2); // Move to Step 2: Digital Menu
     } catch (err) {
       console.error('Firebase OTP Verification Error:', err);
@@ -189,7 +195,7 @@ export const CustomerQRApp = () => {
   };
 
   const handleCustomerLogout = () => {
-    sessionStorage.removeItem(`dinebuddy_customer_table_${tableId}`);
+    sessionStorage.removeItem(sessionKey);
     setCustomerName('');
     setCustomerPhone('');
     setOtpSent(false);
@@ -293,7 +299,11 @@ export const CustomerQRApp = () => {
     };
 
     try {
-      const res = await api.post(`/public/tables/${encodeURIComponent(tableId)}/order`, orderPayload);
+      const orderUrl = restaurantId
+        ? `/public/restaurants/${encodeURIComponent(restaurantId)}/tables/${encodeURIComponent(tableId)}/order`
+        : `/public/tables/${encodeURIComponent(tableId)}/order`;
+
+      const res = await api.post(orderUrl, orderPayload);
       setActiveOrder(res.data);
       setCart([]);
       setCurrentStep(3); // Move to Step 3: Order Tracking

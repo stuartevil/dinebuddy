@@ -485,8 +485,11 @@ export const TableManagement = () => {
             </div>
 
             {(() => {
+              const restId = selectedRestaurant?.id || qrModalTable.restaurant_id || '';
               const tableSlug = qrModalTable.table_number || qrModalTable.id;
-              const tableOrderUrl = `${window.location.origin}/order/table/${encodeURIComponent(tableSlug)}`;
+              const tableOrderUrl = restId
+                ? `${window.location.origin}/order/restaurant/${restId}/table/${encodeURIComponent(tableSlug)}`
+                : `${window.location.origin}/order/table/${encodeURIComponent(tableSlug)}`;
               const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(tableOrderUrl)}`;
               const qrPrintUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(tableOrderUrl)}`;
 
