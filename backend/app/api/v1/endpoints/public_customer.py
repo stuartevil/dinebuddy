@@ -2,7 +2,13 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.schemas.public_customer_schema import PublicCustomerOrderPayload, PublicTableInfoResponse
+from app.schemas.public_customer_schema import (
+    PublicCustomerOrderPayload,
+    PublicTableInfoResponse,
+    CustomerCheckStatusRequest,
+    CustomerCheckStatusResponse,
+    CustomerRegisterVerifiedRequest
+)
 from app.schemas.order import OrderResponse
 from app.services.public_customer_service import PublicCustomerService
 
@@ -12,6 +18,31 @@ router = APIRouter(prefix="/public", tags=["Public Customer QR"])
 # ============================================================================
 # RESTAURANT-SCOPED TABLE QR ENDPOINTS (Recommended: /public/restaurants/1/tables/OT-01/...)
 # ============================================================================
+
+@router.post("/restaurants/{restaurant_id}/customers/check-status", response_model=CustomerCheckStatusResponse)
+def check_restaurant_customer_status(
+    restaurant_id: str,
+    payload: CustomerCheckStatusRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Checks if customer phone is already verified for this specific restaurant.
+    Returns requires_otp=False if already verified, or requires_otp=True if new to this cafe.
+    """
+    return PublicCustomerService.check_customer_status(db, payload.phone, restaurant_id)
+
+
+@router.post("/restaurants/{restaurant_id}/customers/register")
+def register_restaurant_customer(
+    restaurant_id: str,
+    payload: CustomerRegisterVerifiedRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Registers customer as verified for this restaurant upon successful SMS OTP verification.
+    """
+    return PublicCustomerService.register_verified_customer(db, payload.phone, payload.name, restaurant_id)
+
 
 @router.get("/restaurants/{restaurant_id}/tables/{table_id}/info", response_model=PublicTableInfoResponse)
 def get_public_restaurant_table_and_menu(
@@ -52,9 +83,27 @@ def request_public_restaurant_table_bill(
     return PublicCustomerService.request_bill(db, table_id, restaurant_id)
 
 
-# ============================================================================
-# GLOBAL / SINGLE TABLE QR ENDPOINTS (Backward Compatible: /public/tables/12/...)
-# ============================================================================
+@router.post("/customers/check-status", response_model=CustomerCheckStatusResponse)
+def check_generic_customer_status(
+    payload: CustomerCheckStatusRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Generic fallback endpoint to check customer status.
+    """
+    return PublicCustomerService.check_customer_status(db, payload.phone)
+
+
+@router.post("/customers/register")
+def register_generic_customer(
+    payload: CustomerRegisterVerifiedRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Generic fallback endpoint to register verified customer.
+    """
+    return PublicCustomerService.register_verified_customer(db, payload.phone, payload.name)
+
 
 @router.get("/tables/{table_id}/info", response_model=PublicTableInfoResponse)
 def get_public_table_and_menu(table_id: str, db: Session = Depends(get_db)):

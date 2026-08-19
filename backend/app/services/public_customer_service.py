@@ -3,15 +3,20 @@ from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
+from datetime import datetime
 from app.models.restaurant_table import RestaurantTable
 from app.models.restaurant import Restaurant
 from app.models.restaurant_settings import RestaurantSettings
 from app.models.menu_category import MenuCategory
 from app.models.menu_items import MenuItem
 from app.models.customer import Customer
+from app.models.restaurant_customer import RestaurantCustomer
 from app.models.order import Order
 from app.schemas.order import OrderCreate
-from app.schemas.public_customer_schema import PublicCustomerOrderPayload
+from app.schemas.public_customer_schema import (
+    PublicCustomerOrderPayload,
+    CustomerCheckStatusResponse
+)
 from app.services.billing_service import BillingService
 
 logger = logging.getLogger(__name__)
@@ -255,6 +260,145 @@ class PublicCustomerService:
         }
 
     @staticmethod
+    def check_customer_status(
+        db: Session,
+        phone: str,
+        restaurant_identifier: Optional[Any] = None
+    ) -> CustomerCheckStatusResponse:
+        """
+        Checks if customer phone is already verified for this specific restaurant.
+        If verified at this restaurant, requires_otp is False.
+        """
+        clean_phone = "".join(filter(str.isdigit, str(phone)))
+        if len(clean_phone) > 10 and clean_phone.startswith("91"):
+            clean_phone = clean_phone[-10:]
+
+        if not clean_phone or len(clean_phone) < 10:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Please enter a valid 10-digit mobile number."
+            )
+
+        if restaurant_identifier:
+            restaurant = PublicCustomerService._resolve_restaurant(db, restaurant_identifier)
+            rc = db.query(RestaurantCustomer).filter(
+                RestaurantCustomer.restaurant_id == restaurant.id,
+                RestaurantCustomer.phone == clean_phone
+            ).first()
+
+            if rc and rc.is_verified:
+                return CustomerCheckStatusResponse(
+                    phone=clean_phone,
+                    exists=True,
+                    requires_otp=False,
+                    name=rc.name,
+                    visit_count=rc.visit_count or 1
+                )
+
+            # Check global customer record just to pre-fill known name
+            global_cust = db.query(Customer).filter(Customer.phone == clean_phone).first()
+            return CustomerCheckStatusResponse(
+                phone=clean_phone,
+                exists=False,
+                requires_otp=True,
+                name=global_cust.name if global_cust else None,
+                visit_count=0
+            )
+
+        # Generic lookup
+        global_cust = db.query(Customer).filter(Customer.phone == clean_phone).first()
+        if global_cust:
+            return CustomerCheckStatusResponse(
+                phone=clean_phone,
+                exists=True,
+                requires_otp=False,
+                name=global_cust.name,
+                visit_count=global_cust.total_orders or 1
+            )
+
+        return CustomerCheckStatusResponse(
+            phone=clean_phone,
+            exists=False,
+            requires_otp=True,
+            name=None,
+            visit_count=0
+        )
+
+    @staticmethod
+    def register_verified_customer(
+        db: Session,
+        phone: str,
+        name: Optional[str] = None,
+        restaurant_identifier: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """
+        Registers a customer as verified for a specific restaurant after 1st successful OTP verification.
+        """
+        clean_phone = "".join(filter(str.isdigit, str(phone)))
+        if len(clean_phone) > 10 and clean_phone.startswith("91"):
+            clean_phone = clean_phone[-10:]
+
+        if not clean_phone or len(clean_phone) < 10:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Please enter a valid 10-digit mobile number."
+            )
+
+        clean_name = name.strip() if name else None
+
+        # 1. Update/Create global customer
+        customer = db.query(Customer).filter(Customer.phone == clean_phone).first()
+        if not customer:
+            customer = Customer(
+                phone=clean_phone,
+                name=clean_name,
+                total_orders=0,
+                is_active=True
+            )
+            db.add(customer)
+            db.commit()
+            db.refresh(customer)
+        elif clean_name and not customer.name:
+            customer.name = clean_name
+            db.commit()
+
+        visit_count = 1
+        # 2. Update/Create per-restaurant customer record
+        if restaurant_identifier:
+            restaurant = PublicCustomerService._resolve_restaurant(db, restaurant_identifier)
+            rc = db.query(RestaurantCustomer).filter(
+                RestaurantCustomer.restaurant_id == restaurant.id,
+                RestaurantCustomer.phone == clean_phone
+            ).first()
+
+            if not rc:
+                rc = RestaurantCustomer(
+                    restaurant_id=restaurant.id,
+                    customer_id=customer.id,
+                    phone=clean_phone,
+                    name=clean_name or customer.name,
+                    is_verified=True,
+                    visit_count=1,
+                    last_visit_at=datetime.utcnow()
+                )
+                db.add(rc)
+                db.commit()
+            else:
+                rc.is_verified = True
+                if clean_name:
+                    rc.name = clean_name
+                rc.last_visit_at = datetime.utcnow()
+                visit_count = rc.visit_count or 1
+                db.commit()
+
+        return {
+            "status": "success",
+            "phone": clean_phone,
+            "name": clean_name or (customer.name if customer else None),
+            "visit_count": visit_count
+        }
+
+    @staticmethod
     def place_restaurant_table_order(
         db: Session,
         restaurant_identifier: Any,
@@ -269,23 +413,55 @@ class PublicCustomerService:
 
         customer_id = None
         if payload.phone:
-            clean_phone = payload.phone.strip()
+            clean_phone = "".join(filter(str.isdigit, str(payload.phone)))
+            if len(clean_phone) > 10 and clean_phone.startswith("91"):
+                clean_phone = clean_phone[-10:]
+
+            clean_name = payload.name.strip() if payload.name else None
+
+            # Global customer
             customer = db.query(Customer).filter(Customer.phone == clean_phone).first()
             if not customer:
                 customer = Customer(
                     phone=clean_phone,
-                    name=payload.name.strip() if payload.name else None,
+                    name=clean_name,
                     total_orders=1
                 )
                 db.add(customer)
                 db.commit()
                 db.refresh(customer)
             else:
-                if payload.name:
-                    customer.name = payload.name.strip()
+                if clean_name:
+                    customer.name = clean_name
                 customer.total_orders = (customer.total_orders or 0) + 1
+                customer.last_order_at = datetime.utcnow()
                 db.commit()
             customer_id = customer.id
+
+            # Restaurant-specific customer tracking
+            rc = db.query(RestaurantCustomer).filter(
+                RestaurantCustomer.restaurant_id == restaurant.id,
+                RestaurantCustomer.phone == clean_phone
+            ).first()
+
+            if not rc:
+                rc = RestaurantCustomer(
+                    restaurant_id=restaurant.id,
+                    customer_id=customer.id,
+                    phone=clean_phone,
+                    name=clean_name or customer.name,
+                    is_verified=True,
+                    visit_count=1,
+                    last_visit_at=datetime.utcnow()
+                )
+                db.add(rc)
+                db.commit()
+            else:
+                rc.visit_count = (rc.visit_count or 0) + 1
+                rc.last_visit_at = datetime.utcnow()
+                if clean_name:
+                    rc.name = clean_name
+                db.commit()
 
         # Open table session with customer_id attached
         session = BillingService.open_table_session(db, table.id, customer_id=customer_id)
@@ -310,23 +486,54 @@ class PublicCustomerService:
 
         customer_id = None
         if payload.phone:
-            clean_phone = payload.phone.strip()
+            clean_phone = "".join(filter(str.isdigit, str(payload.phone)))
+            if len(clean_phone) > 10 and clean_phone.startswith("91"):
+                clean_phone = clean_phone[-10:]
+
+            clean_name = payload.name.strip() if payload.name else None
+
             customer = db.query(Customer).filter(Customer.phone == clean_phone).first()
             if not customer:
                 customer = Customer(
                     phone=clean_phone,
-                    name=payload.name.strip() if payload.name else None,
+                    name=clean_name,
                     total_orders=1
                 )
                 db.add(customer)
                 db.commit()
                 db.refresh(customer)
             else:
-                if payload.name:
-                    customer.name = payload.name.strip()
+                if clean_name:
+                    customer.name = clean_name
                 customer.total_orders = (customer.total_orders or 0) + 1
+                customer.last_order_at = datetime.utcnow()
                 db.commit()
             customer_id = customer.id
+
+            # Restaurant-specific tracking
+            rc = db.query(RestaurantCustomer).filter(
+                RestaurantCustomer.restaurant_id == table.restaurant_id,
+                RestaurantCustomer.phone == clean_phone
+            ).first()
+
+            if not rc:
+                rc = RestaurantCustomer(
+                    restaurant_id=table.restaurant_id,
+                    customer_id=customer.id,
+                    phone=clean_phone,
+                    name=clean_name or customer.name,
+                    is_verified=True,
+                    visit_count=1,
+                    last_visit_at=datetime.utcnow()
+                )
+                db.add(rc)
+                db.commit()
+            else:
+                rc.visit_count = (rc.visit_count or 0) + 1
+                rc.last_visit_at = datetime.utcnow()
+                if clean_name:
+                    rc.name = clean_name
+                db.commit()
 
         # Open table session with customer_id attached
         session = BillingService.open_table_session(db, table.id, customer_id=customer_id)

@@ -34,8 +34,9 @@ export const CustomerQRApp = () => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [checkingCustomerStatus, setCheckingCustomerStatus] = useState(false);
   const [authError, setAuthError] = useState('');
 
   // Menu Search & Filters State
@@ -60,15 +61,18 @@ export const CustomerQRApp = () => {
 
   // Load stored customer session if present
   useEffect(() => {
-    const savedCustomer = sessionStorage.getItem(sessionKey);
+    const savedCustomer = sessionStorage.getItem(sessionKey) || localStorage.getItem(sessionKey);
     if (savedCustomer) {
       try {
         const parsed = JSON.parse(savedCustomer);
-        setCustomerName(parsed.name || '');
-        setCustomerPhone(parsed.phone || '');
-        setCurrentStep(2);
+        if (parsed.phone) {
+          setCustomerName(parsed.name || '');
+          setCustomerPhone(parsed.phone || '');
+          setCurrentStep(2);
+        }
       } catch {
         sessionStorage.removeItem(sessionKey);
+        localStorage.removeItem(sessionKey);
       }
     }
   }, [sessionKey]);
@@ -145,33 +149,93 @@ export const CustomerQRApp = () => {
     }
   };
 
-  // Step 1: Send Real Firebase SMS OTP (Strict)
-  const handleRequestFirebaseOtp = async (e) => {
+  // Step 1: Smart Multi-Tenant Customer Authentication & OTP Flow
+  const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
 
-    // If OTP is bypassed for testing, directly save session and proceed to menu
-    if (BYPASS_FIREBASE_OTP) {
-      const sessionData = { 
-        name: customerName.trim() || 'Guest Diner', 
-        phone: customerPhone.trim() || '9999999999' 
-      };
-      sessionStorage.setItem(sessionKey, JSON.stringify(sessionData));
-      setCurrentStep(2);
-      return;
-    }
-
     const cleanPhone = customerPhone.replace(/\D/g, '');
-
     if (cleanPhone.length < 10) {
       setAuthError('Please enter a valid 10-digit mobile number.');
       return;
     }
 
-    setIsVerifying(true);
-    const formattedPhone = `+91${cleanPhone.slice(-10)}`;
+    const targetRestId = restaurantId || restaurantData?.id;
 
+    // 1. If OTP was already sent, verify the 6-digit SMS OTP code
+    if (otpSent) {
+      if (!customerName || !customerName.trim()) {
+        setAuthError('Please enter your full name.');
+        return;
+      }
+      if (!otpCode || otpCode.trim().length !== 6) {
+        setAuthError('Please enter the 6-digit SMS OTP received on your phone.');
+        return;
+      }
+
+      setIsVerifying(true);
+      try {
+        if (confirmationResult) {
+          await confirmationResult.confirm(otpCode.trim());
+        }
+
+        // Register diner as verified for this specific restaurant
+        const regUrl = targetRestId
+          ? `/public/restaurants/${encodeURIComponent(targetRestId)}/customers/register`
+          : `/public/customers/register`;
+        await api.post(regUrl, { phone: cleanPhone, name: customerName.trim() }).catch(() => {});
+
+        const sessionData = { name: customerName.trim(), phone: cleanPhone, verified: true };
+        sessionStorage.setItem(sessionKey, JSON.stringify(sessionData));
+        localStorage.setItem(sessionKey, JSON.stringify(sessionData));
+        setCurrentStep(2); // Move to Step 2: Digital Menu
+      } catch (err) {
+        console.error('Firebase OTP Verification Error:', err);
+        setAuthError('Invalid OTP code. Please enter the exact 6-digit SMS OTP received on your mobile number.');
+      } finally {
+        setIsVerifying(false);
+      }
+      return;
+    }
+
+    // 2. Check if customer is already verified at this restaurant (Zero OTP for Returning Diners)
+    setCheckingCustomerStatus(true);
     try {
+      const checkUrl = targetRestId
+        ? `/public/restaurants/${encodeURIComponent(targetRestId)}/customers/check-status`
+        : `/public/customers/check-status`;
+
+      const res = await api.post(checkUrl, { phone: cleanPhone });
+      const statusData = res.data;
+
+      // Existing verified customer in this restaurant -> NO OTP REQUIRED!
+      if (statusData.requires_otp === false) {
+        const finalName = statusData.name || customerName.trim() || 'Guest Diner';
+        setCustomerName(finalName);
+        const sessionData = { name: finalName, phone: cleanPhone, verified: true };
+        sessionStorage.setItem(sessionKey, JSON.stringify(sessionData));
+        localStorage.setItem(sessionKey, JSON.stringify(sessionData));
+        setCurrentStep(2); // Directly open menu!
+        return;
+      }
+
+      // If customer is known globally from another cafe, prefill their name
+      if (statusData.name && !customerName) {
+        setCustomerName(statusData.name);
+      }
+
+      // 3. New customer to this restaurant -> Send 1-time Firebase SMS OTP
+      if (BYPASS_FIREBASE_OTP) {
+        const finalName = customerName.trim() || statusData.name || 'Guest Diner';
+        const sessionData = { name: finalName, phone: cleanPhone, verified: true };
+        sessionStorage.setItem(sessionKey, JSON.stringify(sessionData));
+        localStorage.setItem(sessionKey, JSON.stringify(sessionData));
+        setCurrentStep(2);
+        return;
+      }
+
+      setIsVerifying(true);
+      const formattedPhone = `+91${cleanPhone.slice(-10)}`;
       setupRecaptcha();
       const appVerifier = window.recaptchaVerifier;
       const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
@@ -179,60 +243,28 @@ export const CustomerQRApp = () => {
       setOtpSent(true);
       setAuthError('');
     } catch (err) {
-      console.error('Firebase SMS OTP Error:', err);
+      console.error('Customer Auth Check / Firebase SMS OTP Error:', err);
       setConfirmationResult(null);
       setOtpSent(false);
-      let errorMsg = err?.message || 'Failed to send SMS OTP.';
+      let errorMsg = err?.response?.data?.detail || err?.message || 'Failed to verify mobile number.';
       if (err?.code === 'auth/invalid-phone-number') {
         errorMsg = 'Invalid phone number format.';
       } else if (err?.code === 'auth/captcha-check-failed' || err?.code === 'auth/unauthorized-domain') {
-        errorMsg = 'Domain not authorized in Firebase Console -> Authentication -> Settings -> Authorized domains.';
+        errorMsg = 'Domain not authorized in Firebase Console.';
       }
-      setAuthError(`Firebase Error: ${errorMsg}`);
+      setAuthError(errorMsg);
     } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  // Step 1: Verify Pure Firebase 6-Digit SMS OTP Code (Strict - No Fallback)
-  const handleVerifyOtpAndProceed = async (e) => {
-    e.preventDefault();
-    setAuthError('');
-
-    if (!customerName || !customerName.trim()) {
-      setAuthError('Please enter your full name.');
-      return;
-    }
-
-    if (!confirmationResult) {
-      setAuthError('No active Firebase OTP session. Please click Send Firebase SMS OTP first.');
-      return;
-    }
-
-    if (!otpCode || otpCode.trim().length !== 6) {
-      setAuthError('Please enter the exact 6-digit SMS OTP received on your phone.');
-      return;
-    }
-
-    setIsVerifying(true);
-
-    try {
-      await confirmationResult.confirm(otpCode.trim());
-      const sessionData = { name: customerName.trim(), phone: customerPhone.trim() };
-      sessionStorage.setItem(sessionKey, JSON.stringify(sessionData));
-      setCurrentStep(2); // Move to Step 2: Digital Menu
-    } catch (err) {
-      console.error('Firebase OTP Verification Error:', err);
-      setAuthError('Invalid OTP code. Please enter the exact 6-digit SMS OTP received on your mobile number.');
-    } finally {
+      setCheckingCustomerStatus(false);
       setIsVerifying(false);
     }
   };
 
   const handleCustomerLogout = () => {
     sessionStorage.removeItem(sessionKey);
+    localStorage.removeItem(sessionKey);
     setCustomerName('');
     setCustomerPhone('');
+    setOtpCode('');
     setOtpSent(false);
     setConfirmationResult(null);
     setCurrentStep(BYPASS_FIREBASE_OTP ? 2 : 1);
@@ -495,7 +527,7 @@ export const CustomerQRApp = () => {
       <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         
         {/* ========================================================================= */}
-        {/* STEP 1: CUSTOMER WELCOME & FIREBASE PHONE OTP LOGIN                       */}
+        {/* STEP 1: CUSTOMER WELCOME & SMART RESTAURANT AUTH                          */}
         {/* ========================================================================= */}
         {currentStep === 1 && (
           <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -505,8 +537,11 @@ export const CustomerQRApp = () => {
               </div>
               <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Welcome to Table #{tableData?.table_number || tableId}!</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.35rem' }}>
-                Enter your name and mobile number to receive a real 6-digit SMS OTP via Firebase.
+                {restaurantData?.name ? `Ordering at ${restaurantData.name}` : 'Self-Ordering System'}
               </p>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(99, 102, 241, 0.12)', color: 'var(--accent-primary)', padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.74rem', fontWeight: 700, marginTop: '0.65rem' }}>
+                ✨ 1-Time SMS OTP for New Diners • Zero OTP on Repeat Visits
+              </div>
             </div>
 
             <div className="panel-card" style={{ padding: '1.5rem', borderRadius: 'var(--radius-xl)' }}>
@@ -516,23 +551,7 @@ export const CustomerQRApp = () => {
                 </div>
               )}
 
-              <form onSubmit={otpSent ? handleVerifyOtpAndProceed : handleRequestFirebaseOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>Your Full Name *</label>
-                  <div style={{ position: 'relative' }}>
-                    <User size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type="text"
-                      required
-                      className="input-control"
-                      style={{ paddingLeft: '2.4rem' }}
-                      placeholder="e.g. Rahul Sharma"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                    />
-                  </div>
-                </div>
-
+              <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>Mobile Number *</label>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -564,6 +583,22 @@ export const CustomerQRApp = () => {
                   </div>
                 </div>
 
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>Your Full Name *</label>
+                  <div style={{ position: 'relative' }}>
+                    <User size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      required={otpSent}
+                      className="input-control"
+                      style={{ paddingLeft: '2.4rem' }}
+                      placeholder="e.g. Rahul Sharma"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 {otpSent && (
                   <div>
                     <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>Enter 6-Digit SMS OTP *</label>
@@ -581,13 +616,24 @@ export const CustomerQRApp = () => {
                       />
                     </div>
                     <span style={{ fontSize: '0.72rem', color: 'var(--success)', marginTop: '0.35rem', display: 'block' }}>
-                      ✓ Real SMS OTP sent via Firebase to {customerPhone}
+                      ✓ Real SMS OTP sent via Firebase to +91 {customerPhone}
                     </span>
                   </div>
                 )}
 
-                <button type="submit" disabled={isVerifying} className="btn btn-primary" style={{ width: '100%', padding: '0.85rem', marginTop: '0.5rem', fontWeight: 800, fontSize: '0.95rem' }}>
-                  {isVerifying ? 'Verifying Phone Credentials...' : otpSent ? 'Verify OTP & Open Menu 📖' : 'Send Firebase SMS OTP 📲'}
+                <button 
+                  type="submit" 
+                  disabled={isVerifying || checkingCustomerStatus} 
+                  className="btn btn-primary" 
+                  style={{ width: '100%', padding: '0.85rem', marginTop: '0.5rem', fontWeight: 800, fontSize: '0.95rem' }}
+                >
+                  {checkingCustomerStatus 
+                    ? 'Checking Account Status... ⏳' 
+                    : isVerifying 
+                    ? 'Verifying Credentials...' 
+                    : otpSent 
+                    ? 'Verify OTP & Open Menu 📖' 
+                    : 'Continue to Menu 📖'}
                 </button>
               </form>
             </div>

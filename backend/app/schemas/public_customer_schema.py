@@ -53,3 +53,21 @@ class PublicCustomerOrderPayload(BaseModel):
     items: List[PublicCustomerOrderItem]
     phone: Optional[str] = None
     name: Optional[str] = None
+
+
+class CustomerCheckStatusRequest(BaseModel):
+    phone: str
+
+
+class CustomerCheckStatusResponse(BaseModel):
+    phone: str
+    exists: bool
+    requires_otp: bool
+    name: Optional[str] = None
+    visit_count: Optional[int] = 0
+
+
+class CustomerRegisterVerifiedRequest(BaseModel):
+    phone: str
+    name: Optional[str] = None
+

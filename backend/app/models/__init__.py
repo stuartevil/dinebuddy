@@ -4,6 +4,7 @@ Database models
 from .restaurant import Restaurant
 from .user import User, UserRole
 from .customer import Customer
+from .restaurant_customer import RestaurantCustomer
 from .user_restaurant_map import UserRestaurant
 from .menu_category import MenuCategory
 from .menu_items import MenuItem
