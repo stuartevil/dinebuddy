@@ -50,9 +50,9 @@ EOF
             fi
 
             echo "🐳 Building and starting Docker containers..."
-            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+            sudo docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 
             echo "🧹 Cleaning unused Docker images..."
-            docker image prune -f
+            sudo docker image prune -f
 
             echo "🎉 DineBuddy successfully deployed to EC2!"
