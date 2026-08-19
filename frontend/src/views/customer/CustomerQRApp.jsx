@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, getMediaUrl } from '../../services/apiClient';
 import { auth, RecaptchaVerifier, signInWithPhoneNumber } from '../../services/firebase';
-import { 
-  Utensils, Search, Plus, Minus, ShoppingCart, 
-  CheckCircle2, Clock, UtensilsCrossed, Phone, 
-  User, Lock, ArrowRight, X, Sparkles, ChefHat, 
+import {
+  Utensils, Search, Plus, Minus, ShoppingCart,
+  CheckCircle2, Clock, UtensilsCrossed, Phone,
+  User, Lock, ArrowRight, X, Sparkles, ChefHat,
   Bell, CheckCheck, RefreshCw, LogOut, ShieldCheck,
   Trash2, ShoppingBag, Receipt, MapPin
 } from 'lucide-react';
@@ -113,7 +113,7 @@ export const CustomerQRApp = () => {
             setActiveOrder(res.data);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 4000);
 
     return () => clearInterval(pollInterval);
@@ -141,7 +141,7 @@ export const CustomerQRApp = () => {
     if (!window.recaptchaVerifier) {
       window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         size: 'invisible',
-        callback: () => {},
+        callback: () => { },
         'expired-callback': () => {
           setAuthError('Recaptcha expired. Please try sending OTP again.');
         }
@@ -183,7 +183,7 @@ export const CustomerQRApp = () => {
         const regUrl = targetRestId
           ? `/public/restaurants/${encodeURIComponent(targetRestId)}/customers/register`
           : `/public/customers/register`;
-        await api.post(regUrl, { phone: cleanPhone, name: customerName.trim() }).catch(() => {});
+        await api.post(regUrl, { phone: cleanPhone, name: customerName.trim() }).catch(() => { });
 
         const sessionData = { name: customerName.trim(), phone: cleanPhone, verified: true };
         sessionStorage.setItem(sessionKey, JSON.stringify(sessionData));
@@ -291,7 +291,7 @@ export const CustomerQRApp = () => {
           setSelectedAddons(init);
           return;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     addToCart(dish);
   };
@@ -525,7 +525,7 @@ export const CustomerQRApp = () => {
 
       {/* Main Body Switcher */}
       <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        
+
         {/* ========================================================================= */}
         {/* STEP 1: CUSTOMER WELCOME & SMART RESTAURANT AUTH                          */}
         {/* ========================================================================= */}
@@ -539,9 +539,6 @@ export const CustomerQRApp = () => {
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.35rem' }}>
                 {restaurantData?.name ? `Ordering at ${restaurantData.name}` : 'Self-Ordering System'}
               </p>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(99, 102, 241, 0.12)', color: 'var(--accent-primary)', padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.74rem', fontWeight: 700, marginTop: '0.65rem' }}>
-                ✨ 1-Time SMS OTP for New Diners • Zero OTP on Repeat Visits
-              </div>
             </div>
 
             <div className="panel-card" style={{ padding: '1.5rem', borderRadius: 'var(--radius-xl)' }}>
@@ -621,19 +618,19 @@ export const CustomerQRApp = () => {
                   </div>
                 )}
 
-                <button 
-                  type="submit" 
-                  disabled={isVerifying || checkingCustomerStatus} 
-                  className="btn btn-primary" 
+                <button
+                  type="submit"
+                  disabled={isVerifying || checkingCustomerStatus}
+                  className="btn btn-primary"
                   style={{ width: '100%', padding: '0.85rem', marginTop: '0.5rem', fontWeight: 800, fontSize: '0.95rem' }}
                 >
-                  {checkingCustomerStatus 
-                    ? 'Checking Account Status... ⏳' 
-                    : isVerifying 
-                    ? 'Verifying Credentials...' 
-                    : otpSent 
-                    ? 'Verify OTP & Open Menu 📖' 
-                    : 'Continue to Menu 📖'}
+                  {checkingCustomerStatus
+                    ? 'Checking Account Status... ⏳'
+                    : isVerifying
+                      ? 'Verifying Credentials...'
+                      : otpSent
+                        ? 'Verify OTP & Open Menu 📖'
+                        : 'Continue to Menu 📖'}
                 </button>
               </form>
             </div>
@@ -647,8 +644,8 @@ export const CustomerQRApp = () => {
           <>
             {/* Active Order Sticky Quick-Tracking Bar */}
             {activeOrder && (
-              <div 
-                onClick={() => setCurrentStep(3)} 
+              <div
+                onClick={() => setCurrentStep(3)}
                 style={{
                   background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(79, 70, 229, 0.15))',
                   border: '1.5px solid var(--accent-primary)',
@@ -680,9 +677,9 @@ export const CustomerQRApp = () => {
                   </div>
                 </div>
 
-                <button 
-                  type="button" 
-                  className="btn btn-primary btn-sm" 
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
                   style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem', fontWeight: 800, borderRadius: '9999px', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
                   <MapPin size={13} /> Track Order
@@ -707,17 +704,17 @@ export const CustomerQRApp = () => {
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <div style={{ position: 'relative', flex: 1 }}>
                 <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input 
-                  type="text" 
-                  placeholder="Search food & drinks..." 
-                  className="input-control" 
+                <input
+                  type="text"
+                  placeholder="Search food & drinks..."
+                  className="input-control"
                   style={{ paddingLeft: '2.2rem', fontSize: '0.85rem' }}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
 
-              <button 
+              <button
                 onClick={() => setVegOnly(!vegOnly)}
                 className={`btn btn-sm ${vegOnly ? 'btn-success' : 'btn-secondary'}`}
                 style={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}
@@ -728,7 +725,7 @@ export const CustomerQRApp = () => {
 
             {/* Category Pills */}
             <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.35rem' }}>
-              <button 
+              <button
                 onClick={() => setSelectedCategory('All')}
                 className={`btn btn-sm ${selectedCategory === 'All' ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ borderRadius: '9999px', whiteSpace: 'nowrap', fontSize: '0.78rem' }}
@@ -736,8 +733,8 @@ export const CustomerQRApp = () => {
                 All
               </button>
               {categories.map(cat => (
-                <button 
-                  key={cat.id} 
+                <button
+                  key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`btn btn-sm ${selectedCategory === cat.id ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ borderRadius: '9999px', whiteSpace: 'nowrap', fontSize: '0.78rem' }}
@@ -781,7 +778,7 @@ export const CustomerQRApp = () => {
                           <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: dish.is_veg ? '#22c55e' : '#ef4444', display: 'inline-block' }} />
                           <h4 style={{ fontSize: '0.98rem', fontWeight: 700 }}>{dish.name}</h4>
                         </div>
-                        
+
                         {dish.description && (
                           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{dish.description}</p>
                         )}
@@ -814,7 +811,7 @@ export const CustomerQRApp = () => {
         {/* ========================================================================= */}
         {currentStep === 3 && activeOrder && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '0.5rem' }}>
-            
+
             {/* Ticket Header Card */}
             <div className="panel-card" style={{ padding: '1.5rem 1.25rem', borderRadius: 'var(--radius-xl)', textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
@@ -834,7 +831,7 @@ export const CustomerQRApp = () => {
 
               {/* 4-Stage Live Progress Stepper */}
               <div style={{ marginTop: '1.75rem', display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
-                
+
                 {/* Stepper Progress Bar */}
                 {(() => {
                   const status = (activeOrder.status || 'pending').toLowerCase();
@@ -927,19 +924,19 @@ export const CustomerQRApp = () => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {(activeOrder.items || []).map((item, idx) => {
-                  const resolvedName = item.name 
-                    || item.menu_item_name 
-                    || menuItems.find(m => m.id === (item.menu_item_id || item.id))?.name 
+                  const resolvedName = item.name
+                    || item.menu_item_name
+                    || menuItems.find(m => m.id === (item.menu_item_id || item.id))?.name
                     || `Dish #${item.menu_item_id || idx + 1}`;
-                  
-                  const itemPrice = item.total_price 
+
+                  const itemPrice = item.total_price
                     || (item.unit_price ? item.unit_price * item.quantity : 0)
                     || (item.price ? item.price * (item.quantity || item.qty || 1) : 0);
 
                   return (
                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.88rem', padding: '0.35rem 0', borderBottom: idx !== (activeOrder.items.length - 1) ? '1px dashed var(--border-color)' : 'none' }}>
                       <div>
-                        <span style={{ fontWeight: 800, color: 'var(--accent-primary)', marginRight: '0.4rem' }}>{item.quantity || item.qty || 1}x</span> 
+                        <span style={{ fontWeight: 800, color: 'var(--accent-primary)', marginRight: '0.4rem' }}>{item.quantity || item.qty || 1}x</span>
                         <span style={{ fontWeight: 600 }}>{resolvedName}</span>
                         {item.special_instructions && (
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>Note: {item.special_instructions}</div>
@@ -963,14 +960,14 @@ export const CustomerQRApp = () => {
                 ➕ Order More Items / Desserts
               </button>
 
-              <button 
+              <button
                 type="button"
-                onClick={handleRequestBill} 
+                onClick={handleRequestBill}
                 disabled={requestingBill || billRequested}
-                className="btn btn-secondary" 
-                style={{ 
-                  width: '100%', 
-                  padding: '0.8rem', 
+                className="btn btn-secondary"
+                style={{
+                  width: '100%',
+                  padding: '0.8rem',
                   fontWeight: 800,
                   background: billRequested ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-secondary)',
                   color: billRequested ? '#22c55e' : 'var(--text-primary)',
@@ -1005,17 +1002,17 @@ export const CustomerQRApp = () => {
       {/* Floating Bottom Cart Bar (Step 2 Only) */}
       {currentStep === 2 && cart.length > 0 && (
         <div style={{ position: 'sticky', bottom: '1rem', padding: '0 1rem', marginTop: 'auto', zIndex: 100 }}>
-          <div 
+          <div
             onClick={() => setShowReviewModal(true)}
-            className="panel-card" 
-            style={{ 
-              background: 'linear-gradient(135deg, #6366f1, #4f46e5)', 
-              color: '#fff', 
-              padding: '0.85rem 1.15rem', 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              borderRadius: 'var(--radius-lg)', 
+            className="panel-card"
+            style={{
+              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              color: '#fff',
+              padding: '0.85rem 1.15rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderRadius: 'var(--radius-lg)',
               boxShadow: '0 15px 35px rgba(99, 102, 241, 0.4)',
               cursor: 'pointer'
             }}
@@ -1027,13 +1024,13 @@ export const CustomerQRApp = () => {
               <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Total: ₹{total.toFixed(2)} (incl. {taxRate}% tax)</span>
             </div>
 
-            <button 
+            <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowReviewModal(true);
-              }} 
-              className="btn btn-secondary btn-sm" 
+              }}
+              className="btn btn-secondary btn-sm"
               style={{ background: '#fff', color: '#4f46e5', fontWeight: 800, border: 'none', padding: '0.55rem 0.95rem', borderRadius: '9999px', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
               Review & Order 🛒
@@ -1048,7 +1045,7 @@ export const CustomerQRApp = () => {
       {showReviewModal && (
         <div className="modal-backdrop" style={{ zIndex: 1050 }}>
           <div className="modal-box" style={{ maxWidth: '480px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: '1.25rem', borderRadius: '24px' }}>
-            
+
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
               <div>
@@ -1059,9 +1056,9 @@ export const CustomerQRApp = () => {
                   Table #{tableData?.table_number || tableId} • {restaurantData?.name || 'Restaurant'}
                 </span>
               </div>
-              <button 
+              <button
                 type="button"
-                onClick={() => setShowReviewModal(false)} 
+                onClick={() => setShowReviewModal(false)}
                 style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}
               >
                 <X size={18} />
@@ -1207,95 +1204,95 @@ export const CustomerQRApp = () => {
         </div>
       )}
 
-        {/* Customization Modal for Customer QR App */}
-        {customizingDish && (
-          <div className="modal-backdrop">
-            <div className="modal-box" style={{ maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem' }}>✨ Customize {customizingDish.name}</h3>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Base Price: ₹{parseFloat(customizingDish.price || 0).toFixed(2)}</span>
-                </div>
-                <button onClick={() => setCustomizingDish(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                  <X size={18} />
-                </button>
+      {/* Customization Modal for Customer QR App */}
+      {customizingDish && (
+        <div className="modal-backdrop">
+          <div className="modal-box" style={{ maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem' }}>✨ Customize {customizingDish.name}</h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Base Price: ₹{parseFloat(customizingDish.price || 0).toFixed(2)}</span>
               </div>
+              <button onClick={() => setCustomizingDish(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
 
-              {/* Render Groups */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.25rem' }}>
-                {customizingGroups.map(group => {
-                  const isSingle = group.max_selectable === 1;
-                  const groupSelected = selectedAddons[group.id] || [];
+            {/* Render Groups */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.25rem' }}>
+              {customizingGroups.map(group => {
+                const isSingle = group.max_selectable === 1;
+                const groupSelected = selectedAddons[group.id] || [];
 
-                  return (
-                    <div key={group.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>{group.name}</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
-                          {group.min_selectable > 0 ? '(Required)' : '(Optional)'}
-                        </span>
-                      </div>
+                return (
+                  <div key={group.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{group.name}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                        {group.min_selectable > 0 ? '(Required)' : '(Optional)'}
+                      </span>
+                    </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        {group.options.map(opt => {
-                          const isChecked = groupSelected.some(o => o.id === opt.id);
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {group.options.map(opt => {
+                        const isChecked = groupSelected.some(o => o.id === opt.id);
 
-                          return (
-                            <label key={opt.id} style={{ fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0.6rem', borderRadius: '6px', background: isChecked ? 'rgba(99, 102, 241, 0.15)' : 'transparent', border: isChecked ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid transparent', cursor: 'pointer' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <input
-                                  type={isSingle ? "radio" : "checkbox"}
-                                  name={`cust_group_${group.id}`}
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    if (isSingle) {
-                                      setSelectedAddons({ ...selectedAddons, [group.id]: [opt] });
+                        return (
+                          <label key={opt.id} style={{ fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0.6rem', borderRadius: '6px', background: isChecked ? 'rgba(99, 102, 241, 0.15)' : 'transparent', border: isChecked ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid transparent', cursor: 'pointer' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <input
+                                type={isSingle ? "radio" : "checkbox"}
+                                name={`cust_group_${group.id}`}
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isSingle) {
+                                    setSelectedAddons({ ...selectedAddons, [group.id]: [opt] });
+                                  } else {
+                                    if (isChecked) {
+                                      setSelectedAddons({ ...selectedAddons, [group.id]: groupSelected.filter(o => o.id !== opt.id) });
                                     } else {
-                                      if (isChecked) {
-                                        setSelectedAddons({ ...selectedAddons, [group.id]: groupSelected.filter(o => o.id !== opt.id) });
-                                      } else {
-                                        if (groupSelected.length < group.max_selectable) {
-                                          setSelectedAddons({ ...selectedAddons, [group.id]: [...groupSelected, opt] });
-                                        }
+                                      if (groupSelected.length < group.max_selectable) {
+                                        setSelectedAddons({ ...selectedAddons, [group.id]: [...groupSelected, opt] });
                                       }
                                     }
-                                  }}
-                                />
-                                <span>{opt.name}</span>
-                              </div>
-                              <span style={{ fontWeight: 700, color: 'var(--success)' }}>
-                                {parseFloat(opt.price || 0) > 0 ? `+₹${parseFloat(opt.price).toFixed(2)}` : 'Free'}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
+                                  }
+                                }}
+                              />
+                              <span>{opt.name}</span>
+                            </div>
+                            <span style={{ fontWeight: 700, color: 'var(--success)' }}>
+                              {parseFloat(opt.price || 0) > 0 ? `+₹${parseFloat(opt.price).toFixed(2)}` : 'Free'}
+                            </span>
+                          </label>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Quantity Stepper & Add to Cart Button */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.06)', padding: '0.3rem 0.6rem', borderRadius: '6px' }}>
+                <button type="button" onClick={() => setCustomizingQty(q => Math.max(1, q - 1))} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><Minus size={14} /></button>
+                <span style={{ fontWeight: 800 }}>{customizingQty}</span>
+                <button type="button" onClick={() => setCustomizingQty(q => q + 1)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><Plus size={14} /></button>
               </div>
 
-              {/* Quantity Stepper & Add to Cart Button */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.06)', padding: '0.3rem 0.6rem', borderRadius: '6px' }}>
-                  <button type="button" onClick={() => setCustomizingQty(q => Math.max(1, q - 1))} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><Minus size={14} /></button>
-                  <span style={{ fontWeight: 800 }}>{customizingQty}</span>
-                  <button type="button" onClick={() => setCustomizingQty(q => q + 1)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><Plus size={14} /></button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleConfirmCustomization}
-                  className="btn btn-primary"
-                  style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                >
-                  <Plus size={16} />
-                  <span>Add to Order • ₹{((parseFloat(customizingDish.price || 0) + Object.values(selectedAddons).flat().reduce((s, o) => s + (parseFloat(o.price || 0)), 0)) * customizingQty).toFixed(2)}</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleConfirmCustomization}
+                className="btn btn-primary"
+                style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Plus size={16} />
+                <span>Add to Order • ₹{((parseFloat(customizingDish.price || 0) + Object.values(selectedAddons).flat().reduce((s, o) => s + (parseFloat(o.price || 0)), 0)) * customizingQty).toFixed(2)}</span>
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
     </div>
   );
