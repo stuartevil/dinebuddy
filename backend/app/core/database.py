@@ -10,12 +10,14 @@ from app.core.config import settings
 # Create SQLAlchemy engine kwargs
 engine_kwargs = {
     "pool_pre_ping": True,
+    "pool_recycle": 1800,  # Recycle connections after 30 min to prevent AWS connection drop/timeouts
     "echo": settings.ENVIRONMENT == "development",
 }
 
 if "sqlite" not in settings.DATABASE_URL.lower():
     engine_kwargs["pool_size"] = 10
     engine_kwargs["max_overflow"] = 20
+    engine_kwargs["pool_timeout"] = 30
 
 engine = create_engine(
     settings.DATABASE_URL,
