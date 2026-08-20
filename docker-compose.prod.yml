@@ -1,7 +1,45 @@
-# Production Docker Compose Configuration
-# Use this for deploying on AWS EC2 or any cloud VM
+# Production Docker Compose Configuration for DineBuddy
+# Self-contained with PostgreSQL Database, Redis, FastAPI Backend, and Nginx Frontend
 
 services:
+  # 1. PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: dinebuddy-db-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-dinebuddy}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 2. Redis (For OTP & Caching)
+  redis:
+    image: redis:7-alpine
+    container_name: dinebuddy-redis-prod
+    restart: always
+    ports:
+      - "6379:6379"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 3. FastAPI Backend
   backend:
     build:
       context: ./backend
@@ -9,26 +47,34 @@ services:
     container_name: dinebuddy-backend-prod
     restart: always
     environment:
-      # These should come from environment variables on the host
-      - ENVIRONMENT=${ENVIRONMENT:-production}
-      - PROJECT_NAME=${PROJECT_NAME:-DineBuddy}
-      - DATABASE_URL=${DATABASE_URL}
+      - ENVIRONMENT=production
+      - PROJECT_NAME=DineBuddy
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_HOST=${POSTGRES_HOST:-localhost}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-dinebuddy}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
       - SECRET_KEY=${SECRET_KEY:-dinebuddy-production-secret-key-2026-safe}
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
-      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - CORS_ORIGINS=*
+      - AWS_REGION=ap-south-1
     ports:
       - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    volumes:
+      - uploads_data:/app/uploads
     command: >
       sh -c "
         echo '⏳ Waiting for database connection...' &&
@@ -36,7 +82,7 @@ services:
         echo '🔄 Verifying database schema...' &&
         (alembic upgrade head || true) &&
         echo '🚀 Starting production server...' &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
       "
     logging:
       driver: "json-file"
@@ -44,6 +90,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # 4. Frontend (Nginx)
   frontend:
     build:
       context: ./frontend
@@ -60,6 +107,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-# Note: Database is not included in production compose
-# Use AWS RDS or managed PostgreSQL service instead
-
+volumes:
+  postgres_data:
+  uploads_data:
