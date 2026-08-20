@@ -271,7 +271,7 @@ export const CustomerQRApp = () => {
   };
 
   const handleDishClick = async (dish) => {
-    const restId = restaurantData?.id;
+    const restId = restaurantData?.id || tableData?.restaurant_id || restaurantId;
     if (restId) {
       try {
         const res = await api.get(`/restaurants/${restId}/menu-items/${dish.id}/addon-groups`);
@@ -371,11 +371,17 @@ export const CustomerQRApp = () => {
     setPlacingOrder(true);
 
     const orderPayload = {
-      items: cart.map(i => ({
-        menu_item_id: i.id,
-        quantity: i.qty,
-        special_instructions: specialInstructions[i.id] || null
-      })),
+      items: cart.map(i => {
+        const userNote = specialInstructions[i.cartItemId || i.id] || specialInstructions[i.id] || '';
+        const addonNote = i.note || (i.addonsTitle ? `Add-ons: ${i.addonsTitle.replace(/^\(|\)$/g, '')}` : '');
+        const combinedInstructions = [addonNote, userNote].filter(Boolean).join(' | ') || null;
+
+        return {
+          menu_item_id: i.id,
+          quantity: i.qty,
+          special_instructions: combinedInstructions
+        };
+      }),
       phone: customerPhone ? customerPhone.trim() : '9999999999',
       name: customerName ? customerName.trim() : 'Guest Diner'
     };

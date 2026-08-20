@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
+import { printKOT, printBill } from '../../services/printService';
 import { 
   QrCode, 
   Plus, 
+  Minus,
   Users, 
   Receipt, 
   X, 
@@ -11,7 +13,10 @@ import {
   Trash2, 
   Utensils, 
   DollarSign,
-  AlertTriangle
+  AlertTriangle,
+  Printer,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 
 export const TableManagement = () => {
@@ -24,7 +29,7 @@ export const TableManagement = () => {
   // Selected table management modal state
   const [selectedTable, setSelectedTable] = useState(null);
   const [qrModalTable, setQrModalTable] = useState(null);
-  const [tableOrders, setTableOrders] = useState({}); // { [tableId]: [ { id, name, price, qty } ] }
+  const [tableOrders, setTableOrders] = useState({}); // { [tableId]: [ { cartItemId, id, name, price, qty, addonsTitle, note, selectedOpts } ] }
 
   // Add Table Modal state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -32,6 +37,13 @@ export const TableManagement = () => {
 
   // Add Order item state inside Selected Table Modal
   const [selectedItemForm, setSelectedItemForm] = useState({ item_id: '', qty: 1 });
+
+  // Addon Customization Modal State for Table Management
+  const [customizingDish, setCustomizingDish] = useState(null);
+  const [customizingGroups, setCustomizingGroups] = useState([]);
+  const [selectedAddons, setSelectedAddons] = useState({});
+  const [customizingQty, setCustomizingQty] = useState(1);
+  const [loadingAddons, setLoadingAddons] = useState(false);
 
   // Fetch real tables and menu items from backend API
   const fetchTablesAndMenu = () => {
@@ -117,33 +129,35 @@ export const TableManagement = () => {
     });
   };
 
-  // Add Item/Order to Selected Table
-  const handleAddItemToTableOrder = (e) => {
-    e.preventDefault();
+  // Direct add helper for items without addons
+  const addItemToTableOrderDirect = (item, qty = 1) => {
     if (!selectedTable) return;
-
-    const item = menuItems.find(m => m.id === Number(selectedItemForm.item_id));
-    if (!item) {
-      addToast('error', 'Invalid Item', 'Select a valid menu item.');
-      return;
-    }
-
-    const qty = Number(selectedItemForm.qty) || 1;
     const itemPrice = parseFloat(item.price) || 0;
+    const cartItemId = `${item.id}`;
 
     setTableOrders(prev => {
       const currentList = prev[selectedTable.id] || [];
-      const existsIndex = currentList.findIndex(i => i.id === item.id);
+      const existsIndex = currentList.findIndex(i => (i.cartItemId === cartItemId || i.id === item.id) && !i.addonsTitle);
       let updated;
       if (existsIndex >= 0) {
         updated = currentList.map((i, idx) => idx === existsIndex ? { ...i, qty: i.qty + qty } : i);
       } else {
-        updated = [...currentList, { id: item.id, name: item.name, price: itemPrice, qty }];
+        updated = [
+          ...currentList,
+          {
+            cartItemId,
+            id: item.id,
+            name: item.name,
+            price: itemPrice,
+            qty,
+            addonsTitle: '',
+            note: ''
+          }
+        ];
       }
       return { ...prev, [selectedTable.id]: updated };
     });
 
-    // Auto mark table as occupied if items added
     if (selectedTable.status !== 'occupied') {
       handleUpdateStatus(selectedTable.id, 'occupied');
     }
@@ -151,12 +165,158 @@ export const TableManagement = () => {
     addToast('success', 'Item Added to Table Order', `${qty}x ${item.name} added to ${selectedTable.table_number}`);
   };
 
+  // Add Item / Open Customization when clicking Add to Bill
+  const handleAddItemToTableOrder = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedTable || !selectedRestaurant) return;
+
+    const item = menuItems.find(m => m.id === Number(selectedItemForm.item_id));
+    if (!item) {
+      addToast('error', 'Invalid Item', 'Select a valid menu dish.');
+      return;
+    }
+
+    const qty = Number(selectedItemForm.qty) || 1;
+
+    setLoadingAddons(true);
+    try {
+      // Check if dish has attached add-on groups
+      const res = await api.get(`/restaurants/${selectedRestaurant.id}/menu-items/${item.id}/addon-groups`);
+      const rawGroups = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      const groups = rawGroups.filter(g => g && g.is_active && Array.isArray(g.options) && g.options.length > 0);
+
+      if (groups.length > 0) {
+        // Open Customization Modal for Table Order
+        setCustomizingDish(item);
+        setCustomizingGroups(groups);
+        setCustomizingQty(qty);
+
+        // Pre-select default options if min_selectable > 0
+        const init = {};
+        groups.forEach(g => {
+          if (g.min_selectable > 0 && Array.isArray(g.options) && g.options.length > 0) {
+            init[g.id] = [g.options[0]];
+          } else {
+            init[g.id] = [];
+          }
+        });
+        setSelectedAddons(init);
+      } else {
+        // Simple item without add-ons -> add directly
+        addItemToTableOrderDirect(item, qty);
+      }
+    } catch (err) {
+      console.error("Error fetching add-ons for table order:", err);
+      addItemToTableOrderDirect(item, qty);
+    } finally {
+      setLoadingAddons(false);
+    }
+  };
+
+  // Confirm and Add Customized Item with Add-ons to Table Order
+  const handleConfirmTableCustomization = () => {
+    if (!customizingDish || !selectedTable) return;
+
+    const basePrice = parseFloat(customizingDish.price || 0);
+    const selectedOpts = Object.values(selectedAddons || {}).flat().filter(Boolean);
+    const addonsPrice = selectedOpts.reduce((sum, o) => sum + (parseFloat(o?.price || 0)), 0);
+    const unitPrice = basePrice + addonsPrice;
+    const addonsText = selectedOpts.map(o => o?.name).filter(Boolean).join(', ');
+    const cartItemId = `${customizingDish.id}-${selectedOpts.map(o => o?.id).sort().join('-')}`;
+
+    setTableOrders(prev => {
+      const currentList = prev[selectedTable.id] || [];
+      const existsIndex = currentList.findIndex(i => i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsText ? `(${addonsText})` : '')));
+      let updated;
+      if (existsIndex >= 0) {
+        updated = currentList.map((i, idx) => idx === existsIndex ? { ...i, qty: i.qty + customizingQty } : i);
+      } else {
+        updated = [
+          ...currentList,
+          {
+            cartItemId,
+            id: customizingDish.id,
+            name: customizingDish.name,
+            price: unitPrice,
+            qty: customizingQty,
+            addonsTitle: addonsText ? `(${addonsText})` : '',
+            note: addonsText ? `Add-ons: ${addonsText}` : '',
+            selectedOpts
+          }
+        ];
+      }
+      return { ...prev, [selectedTable.id]: updated };
+    });
+
+    if (selectedTable.status !== 'occupied') {
+      handleUpdateStatus(selectedTable.id, 'occupied');
+    }
+
+    addToast('success', 'Customized Item Added', `${customizingQty}x ${customizingDish.name} ${addonsText ? `(${addonsText})` : ''} added to ${selectedTable.table_number}`);
+    setCustomizingDish(null);
+    setCustomizingGroups([]);
+    setSelectedAddons({});
+    setCustomizingQty(1);
+  };
+
   // Remove Item from Table Order
-  const handleRemoveItemFromTableOrder = (tableId, itemId) => {
+  const handleRemoveItemFromTableOrder = (tableId, cartItemId) => {
     setTableOrders(prev => ({
       ...prev,
-      [tableId]: (prev[tableId] || []).filter(i => i.id !== itemId),
+      [tableId]: (prev[tableId] || []).filter(i => (i.cartItemId || i.id) !== cartItemId),
     }));
+  };
+
+  // Print KOT from Table Modal
+  const handlePrintTableKOT = (tableId) => {
+    const tableObj = tables.find(t => t.id === tableId) || selectedTable;
+    const items = tableOrders[tableId] || [];
+    if (items.length === 0) {
+      addToast('warning', 'No Items', 'No items ordered on this table to print KOT.');
+      return;
+    }
+    const orderData = {
+      order_number: `KOT-${Date.now().toString().slice(-4)}`,
+      table_number: tableObj?.table_number || 'Table',
+      created_at: new Date().toISOString(),
+      items: items.map(i => ({
+        ...i,
+        quantity: i.qty,
+        special_instructions: i.note || i.addonsTitle || ''
+      }))
+    };
+    printKOT(orderData, selectedRestaurant || {});
+    addToast('info', 'KOT Sent to Printer', `Kitchen Order Ticket printed for ${tableObj?.table_number}`);
+  };
+
+  // Print Bill from Table Modal
+  const handlePrintTableBill = (tableId) => {
+    const tableObj = tables.find(t => t.id === tableId) || selectedTable;
+    const items = tableOrders[tableId] || [];
+    if (items.length === 0) {
+      addToast('warning', 'No Items', 'No items ordered on this table to print bill.');
+      return;
+    }
+    const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    const gst = subtotal * 0.05;
+    const total = subtotal + gst;
+
+    const billData = {
+      order_number: `BILL-${Date.now().toString().slice(-4)}`,
+      table_number: tableObj?.table_number || 'Table',
+      created_at: new Date().toISOString(),
+      items: items.map(i => ({
+        ...i,
+        quantity: i.qty,
+        special_instructions: i.note || i.addonsTitle || ''
+      })),
+      subtotal,
+      gst,
+      total,
+      payment_method: 'CASH / CARD',
+      payment_status: 'PAID'
+    };
+    printBill(billData, selectedRestaurant || {});
   };
 
   // Checkout and Pay Table Bill
@@ -205,7 +365,7 @@ export const TableManagement = () => {
             </span>
             <h1 style={{ fontSize: '1.6rem' }}>Restaurant Tables & Floor Plan Management</h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-              Select any table box below to view running bill, add order items, or collect payment.
+              Select any table box below to view running bill, add customized order items, or collect payment.
             </p>
           </div>
 
@@ -254,7 +414,6 @@ export const TableManagement = () => {
             else if (tbl.status === 'reserved') { statusBadge = 'badge-info'; border = 'rgba(59, 130, 246, 0.3)'; }
 
             const billTotal = getTableBillTotal(tbl.id);
-            const currentItems = tableOrders[tbl.id] || [];
 
             return (
               <div 
@@ -318,11 +477,10 @@ export const TableManagement = () => {
         </div>
       )}
 
-
       {/* Selected Table Order & Billing Control Modal */}
       {selectedTable && (
         <div className="modal-backdrop">
-          <div className="modal-box" style={{ maxWidth: '620px' }}>
+          <div className="modal-box" style={{ maxWidth: '640px' }}>
             
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
@@ -347,7 +505,6 @@ export const TableManagement = () => {
                 </button>
               </div>
             </div>
-
 
             {/* Status Change Selector */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', background: 'var(--bg-secondary)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
@@ -397,8 +554,21 @@ export const TableManagement = () => {
                     onChange={(e) => setSelectedItemForm({ ...selectedItemForm, qty: e.target.value })} 
                   />
 
-                  <button type="submit" className="btn btn-primary btn-sm">
-                    <Plus size={14} /> Add to Bill
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary btn-sm"
+                    disabled={loadingAddons}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    {loadingAddons ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" /> Checking...
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={14} /> Add to Bill
+                      </>
+                    )}
                   </button>
                 </form>
               )}
@@ -406,9 +576,31 @@ export const TableManagement = () => {
 
             {/* Current Table Running Bill */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.25rem' }}>
-              <h4 style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Receipt size={16} color="var(--accent-primary)" /> Running Bill Items
-              </h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Receipt size={16} color="var(--accent-primary)" /> Running Bill Items
+                </h4>
+                {tableOrders[selectedTable.id] && tableOrders[selectedTable.id].length > 0 && (
+                  <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    <button
+                      onClick={() => handlePrintTableKOT(selectedTable.id)}
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                      title="Print KOT to Thermal Printer"
+                    >
+                      <Printer size={12} /> KOT
+                    </button>
+                    <button
+                      onClick={() => handlePrintTableBill(selectedTable.id)}
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                      title="Print Bill to Thermal Printer"
+                    >
+                      <Receipt size={12} /> Bill Slip
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {(!tableOrders[selectedTable.id] || tableOrders[selectedTable.id].length === 0) ? (
                 <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
@@ -416,14 +608,23 @@ export const TableManagement = () => {
                 </div>
               ) : (
                 tableOrders[selectedTable.id].map(item => (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div key={item.cartItemId || item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{item.name}</div>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{item.qty}x @ ₹{item.price.toFixed(2)}</span>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <span>{item.name}</span>
+                        {item.addonsTitle && (
+                          <span className="badge badge-info" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>
+                            ✨ {item.addonsTitle.replace(/^\(|\)$/g, '')}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        {item.qty}x @ ₹{parseFloat(item.price || 0).toFixed(2)}
+                      </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>₹{(item.price * item.qty).toFixed(2)}</span>
-                      <button onClick={() => handleRemoveItemFromTableOrder(selectedTable.id, item.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
+                      <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>₹{(parseFloat(item.price || 0) * item.qty).toFixed(2)}</span>
+                      <button onClick={() => handleRemoveItemFromTableOrder(selectedTable.id, item.cartItemId || item.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }} title="Remove Item">
                         <Trash2 size={15} />
                       </button>
                     </div>
@@ -445,6 +646,120 @@ export const TableManagement = () => {
               </div>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* Customization Modal for Table Order Item */}
+      {customizingDish && (
+        <div className="modal-backdrop" style={{ zIndex: 1100 }}>
+          <div className="modal-box" style={{ maxWidth: '500px', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Sparkles size={18} color="var(--accent-primary)" /> Customize {customizingDish.name}
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  For Table: <strong>{selectedTable?.table_number}</strong> • Base Price: ₹{parseFloat(customizingDish.price || 0).toFixed(2)}
+                </span>
+              </div>
+              <button onClick={() => setCustomizingDish(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Render Groups */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.25rem' }}>
+              {customizingGroups.map(group => {
+                const isSingle = group.max_selectable === 1;
+                const groupSelected = selectedAddons[group.id] || [];
+
+                return (
+                  <div key={group.id} style={{ background: 'var(--bg-secondary)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{group.name}</span>
+                      <span className={`badge ${group.min_selectable > 0 ? 'badge-primary' : 'badge-secondary'}`} style={{ fontSize: '0.7rem' }}>
+                        {group.min_selectable > 0 ? 'Required' : 'Optional (Max ' + (group.max_selectable || 'Any') + ')'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {(group.options || []).map(opt => {
+                        const isChecked = groupSelected.some(o => o.id === opt.id);
+
+                        return (
+                          <label 
+                            key={opt.id} 
+                            style={{ 
+                              fontSize: '0.82rem', 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center', 
+                              padding: '0.5rem 0.75rem', 
+                              borderRadius: 'var(--radius-sm)', 
+                              background: isChecked ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-primary)', 
+                              border: isChecked ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', 
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <input
+                                type={isSingle ? "radio" : "checkbox"}
+                                name={`table_grp_${group.id}`}
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isSingle) {
+                                    setSelectedAddons({ ...selectedAddons, [group.id]: [opt] });
+                                  } else {
+                                    if (isChecked) {
+                                      setSelectedAddons({ ...selectedAddons, [group.id]: groupSelected.filter(o => o.id !== opt.id) });
+                                    } else {
+                                      if (groupSelected.length < (group.max_selectable || 99)) {
+                                        setSelectedAddons({ ...selectedAddons, [group.id]: [...groupSelected, opt] });
+                                      } else {
+                                        addToast('warning', 'Limit Reached', `You can select maximum ${group.max_selectable} options for ${group.name}`);
+                                      }
+                                    }
+                                  }
+                                }}
+                              />
+                              <span style={{ fontWeight: isChecked ? 700 : 500 }}>{opt.name}</span>
+                            </div>
+                            <span style={{ fontWeight: 700, color: parseFloat(opt.price || 0) > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+                              {parseFloat(opt.price || 0) > 0 ? `+₹${parseFloat(opt.price).toFixed(2)}` : 'Free'}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Quantity Stepper & Add to Order Button */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                <button type="button" onClick={() => setCustomizingQty(q => Math.max(1, q - 1))} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                  <Minus size={14} />
+                </button>
+                <span style={{ fontWeight: 800, minWidth: '20px', textAlign: 'center' }}>{customizingQty}</span>
+                <button type="button" onClick={() => setCustomizingQty(q => q + 1)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                  <Plus size={14} />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConfirmTableCustomization}
+                className="btn btn-primary"
+                style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+              >
+                <Plus size={16} />
+                <span>Add to Table • ₹{((parseFloat(customizingDish?.price || 0) + Object.values(selectedAddons || {}).flat().reduce((s, o) => s + (parseFloat(o?.price || 0)), 0)) * customizingQty).toFixed(2)}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
