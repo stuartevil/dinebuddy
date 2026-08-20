@@ -22,6 +22,26 @@ function executePrint(htmlContent) {
     iframe.style.border = '0';
     document.body.appendChild(iframe);
 
+    let printed = false;
+    const triggerPrint = () => {
+      if (printed) return;
+      printed = true;
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } catch (e) {
+        console.error("Thermal print error:", e);
+      }
+      setTimeout(() => {
+        try {
+          if (iframe.parentNode) {
+            iframe.remove();
+          }
+        } catch (e) {}
+        resolve();
+      }, 500);
+    };
+
     const doc = iframe.contentWindow.document;
     doc.open();
     doc.write(htmlContent);
@@ -29,27 +49,11 @@ function executePrint(htmlContent) {
 
     // Trigger window.print() once content renders
     iframe.onload = () => {
-      setTimeout(() => {
-        try {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-        } catch (e) {
-          console.error("Thermal print error:", e);
-        }
-        resolve();
-      }, 250);
+      setTimeout(triggerPrint, 250);
     };
 
-    // Backup trigger fallback
-    setTimeout(() => {
-      try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (e) {
-        // ignore fallback errors
-      }
-      resolve();
-    }, 500);
+    // Backup trigger fallback if onload doesn't fire
+    setTimeout(triggerPrint, 600);
   });
 }
 
@@ -110,16 +114,20 @@ export const printKOT = (order, restaurant = {}) => {
           size: 80mm auto;
           margin: 0mm;
         }
+        * {
+          box-sizing: border-box;
+        }
         body {
-          width: 76mm;
+          width: 74mm;
           margin: 0 auto;
-          padding: 8px 6px;
+          padding: 8px 12px 8px 6px;
           font-family: 'Segoe UI', Arial, 'Courier New', monospace, sans-serif;
           font-size: 13px;
           font-weight: 700;
-          color: #000;
           line-height: 1.3;
+          color: #000;
           background: #fff;
+          box-sizing: border-box;
         }
         .header {
           text-align: center;
@@ -306,6 +314,9 @@ export const printBill = (bill, restaurant = {}) => {
           margin: 0;
           size: 80mm auto;
         }
+        * {
+          box-sizing: border-box;
+        }
         body {
           font-family: 'Segoe UI', Arial, 'Courier New', monospace, sans-serif;
           font-size: 12px;
@@ -314,8 +325,9 @@ export const printBill = (bill, restaurant = {}) => {
           color: #000;
           background: #fff;
           margin: 0;
-          padding: 8px 6px;
-          width: 74mm;
+          padding: 8px 12px 8px 6px;
+          width: 72mm;
+          box-sizing: border-box;
         }
         .header {
           text-align: center;
