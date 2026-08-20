@@ -1,7 +1,45 @@
-# Production Docker Compose Configuration for DineBuddy with Supabase Cloud Database
+# Production Docker Compose Configuration for DineBuddy (Self-Contained Ultra-Fast Stack)
+# Co-located PostgreSQL, Redis, FastAPI Backend, and Nginx Frontend on AWS EC2
 
 services:
-  # 1. FastAPI Backend (Connected to Supabase PostgreSQL Pooler)
+  # 1. Local PostgreSQL Database (0ms Sub-millisecond latency)
+  db:
+    image: postgres:15-alpine
+    container_name: dinebuddy-db-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-dinebuddy}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 2. Redis (For OTP & Caching)
+  redis:
+    image: redis:7-alpine
+    container_name: dinebuddy-redis-prod
+    restart: always
+    ports:
+      - "6379:6379"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 3. FastAPI Backend
   backend:
     build:
       context: ./backend
@@ -11,12 +49,20 @@ services:
     environment:
       - ENVIRONMENT=production
       - PROJECT_NAME=DineBuddy
-      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres.iahzjepenwomwvjjtszo:HrXbnu%24%24TmqDV4j@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/dinebuddy}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
       - SECRET_KEY=${SECRET_KEY:-dinebuddy-production-secret-key-2026-safe}
       - CORS_ORIGINS=*
       - AWS_REGION=ap-south-1
     ports:
       - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
@@ -27,7 +73,8 @@ services:
       - uploads_data:/app/uploads
     command: >
       sh -c "
-        echo '⏳ Connecting to Supabase cloud database...' &&
+        echo '⏳ Waiting for local database connection...' &&
+        sleep 2 &&
         echo '🔄 Verifying database schema with Alembic...' &&
         (alembic upgrade head || true) &&
         echo '🚀 Starting production server...' &&
@@ -39,7 +86,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # 2. Frontend (Nginx with Gzip Compression)
+  # 4. Frontend (Nginx with Gzip Compression)
   frontend:
     build:
       context: ./frontend
@@ -57,4 +104,5 @@ services:
         max-file: "3"
 
 volumes:
+  postgres_data:
   uploads_data:
