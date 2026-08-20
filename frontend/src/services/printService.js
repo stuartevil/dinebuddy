@@ -71,13 +71,29 @@ export const printKOT = (order, restaurant = {}) => {
   const itemsHtml = items.map(item => {
     const qty = item.quantity || item.qty || 1;
     const name = item.name || item.menu_item_name || 'Item';
-    const instructions = item.special_instructions || item.note || '';
+    
+    let addonsHtml = '';
+    if (Array.isArray(item.selectedOpts) && item.selectedOpts.length > 0) {
+      addonsHtml = item.selectedOpts.map(opt => {
+        const optPrice = parseFloat(opt.price || 0);
+        return `<div style="font-size: 12px; font-weight: 800; color: #000; margin-left: 8px; margin-top: 2px;">
+          + ${opt.name} (${optPrice > 0 ? `+₹${optPrice.toFixed(2)}` : 'Free'})
+        </div>`;
+      }).join('');
+    } else if (item.addonsTitle) {
+      addonsHtml = `<div style="font-size: 12px; font-weight: 800; color: #000; margin-left: 8px; margin-top: 2px;">
+        + ${item.addonsTitle.replace(/^\(|\)$/g, '')}
+      </div>`;
+    } else if (item.special_instructions || item.note) {
+      addonsHtml = `<div style="font-size: 11.5px; font-weight: 700; font-style: italic; color: #000; margin-left: 6px; margin-top: 2px;">(${item.special_instructions || item.note})</div>`;
+    }
+
     return `
       <tr>
-        <td style="font-weight: bold; width: 45px; vertical-align: top; font-size: 14px;">${qty}x</td>
-        <td style="vertical-align: top;">
-          <div style="font-weight: bold; font-size: 13px;">${name}</div>
-          ${instructions ? `<div style="font-size: 11px; font-style: italic; color: #222; margin-top: 2px;">(${instructions})</div>` : ''}
+        <td style="font-weight: 900; width: 45px; vertical-align: top; font-size: 15px; padding: 4px 0;">${qty}x</td>
+        <td style="vertical-align: top; padding: 4px 0;">
+          <div style="font-weight: 900; font-size: 14px; color: #000;">${name}</div>
+          ${addonsHtml}
         </td>
       </tr>
     `;
@@ -92,17 +108,17 @@ export const printKOT = (order, restaurant = {}) => {
       <style>
         @page {
           size: 80mm auto;
-          margin: 0mm 0.2in 0mm 0mm;
+          margin: 0mm;
         }
         body {
           width: 76mm;
           margin: 0 auto;
-          padding: 8px 0.2in 8px 4px;
-          padding-right: 0.2in;
-          font-family: 'Courier New', Courier, monospace, sans-serif;
+          padding: 8px 6px;
+          font-family: 'Segoe UI', Arial, 'Courier New', monospace, sans-serif;
           font-size: 13px;
+          font-weight: 700;
           color: #000;
-          line-height: 1.25;
+          line-height: 1.3;
           background: #fff;
         }
         .header {
@@ -112,22 +128,23 @@ export const printKOT = (order, restaurant = {}) => {
           margin-bottom: 6px;
         }
         .title {
-          font-size: 16px;
+          font-size: 18px;
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: 1px;
           margin-bottom: 2px;
         }
         .subtitle {
-          font-size: 12px;
-          font-weight: bold;
+          font-size: 13px;
+          font-weight: 800;
         }
         .meta-table {
           width: 100%;
-          font-size: 12px;
+          font-size: 13px;
+          font-weight: 800;
           margin-bottom: 6px;
-          border-bottom: 1px dashed #000;
-          padding-bottom: 4px;
+          border-bottom: 1.5px dashed #000;
+          padding-bottom: 5px;
         }
         .meta-table td {
           padding: 2px 0;
@@ -138,9 +155,10 @@ export const printKOT = (order, restaurant = {}) => {
           margin-bottom: 8px;
         }
         .items-table th {
-          border-bottom: 1px solid #000;
+          border-bottom: 1.5px solid #000;
           text-align: left;
-          font-size: 12px;
+          font-size: 13px;
+          font-weight: 900;
           padding-bottom: 4px;
         }
         .items-table td {
@@ -151,17 +169,18 @@ export const printKOT = (order, restaurant = {}) => {
           margin: 8px 0;
         }
         .notes-box {
-          border: 1px dashed #000;
-          padding: 5px 6px;
-          font-size: 11px;
+          border: 1.5px dashed #000;
+          padding: 6px 8px;
+          font-size: 12px;
+          font-weight: 800;
           margin-top: 6px;
           background: #fcfcfc;
         }
         .footer {
           text-align: center;
-          font-size: 11px;
+          font-size: 12px;
           margin-top: 8px;
-          font-weight: bold;
+          font-weight: 900;
         }
       </style>
     </head>
@@ -237,16 +256,41 @@ export const printBill = (bill, restaurant = {}) => {
     const name = item.name || item.menu_item_name || 'Item';
     const price = parseFloat(item.price || item.unit_price || 0);
     const lineTotal = price * qty;
+
+    // Check for addons list / details with bold pricing
+    let addonsHtml = '';
+    if (Array.isArray(item.selectedOpts) && item.selectedOpts.length > 0) {
+      addonsHtml = item.selectedOpts.map(opt => {
+        const optPrice = parseFloat(opt.price || 0);
+        return `<div style="font-size: 11px; font-weight: 700; color: #000; margin-left: 8px; padding-top: 2px;">
+          + ${opt.name} (${optPrice > 0 ? `+₹${optPrice.toFixed(2)}` : 'Free'})
+        </div>`;
+      }).join('');
+    } else if (item.addonsTitle) {
+      addonsHtml = `<div style="font-size: 11px; font-weight: 700; color: #000; margin-left: 8px; padding-top: 2px;">
+        + ${item.addonsTitle.replace(/^\(|\)$/g, '')}
+      </div>`;
+    } else if (item.special_instructions && (item.special_instructions.toLowerCase().includes('add-on') || item.special_instructions.includes('+₹') || item.special_instructions.includes('+'))) {
+      addonsHtml = `<div style="font-size: 11px; font-weight: 700; color: #000; margin-left: 8px; padding-top: 2px;">
+        ${item.special_instructions}
+      </div>`;
+    }
+
+    let noteHtml = '';
+    if (item.special_instructions && !item.special_instructions.toLowerCase().includes('add-on') && !item.special_instructions.includes('+₹')) {
+      noteHtml = `<div style="font-size: 10px; font-weight: 700; color: #000; margin-left: 8px; font-style: italic;">Note: ${item.special_instructions}</div>`;
+    }
+
     return `
       <tr>
-        <td style="padding: 3px 0;">
-          <div style="font-weight: bold;">${name}</div>
-          ${item.special_instructions ? `<div style="font-size: 8px; color: #555;">Note: ${item.special_instructions}</div>` : ''}
-          ${item.addonsTitle ? `<div style="font-size: 8px; color: #555;">${item.addonsTitle}</div>` : ''}
+        <td style="padding: 4px 0; vertical-align: top;">
+          <div style="font-weight: 900; font-size: 12.5px; color: #000;">${name}</div>
+          ${addonsHtml}
+          ${noteHtml}
         </td>
-        <td style="text-align: center; padding: 3px 0;">${qty}</td>
-        <td style="text-align: right; padding: 3px 0;">₹${price.toFixed(2)}</td>
-        <td style="text-align: right; padding: 3px 0;">₹${lineTotal.toFixed(2)}</td>
+        <td style="text-align: center; padding: 4px 0; vertical-align: top; font-weight: 900; font-size: 12px;">${qty}</td>
+        <td style="text-align: right; padding: 4px 0; vertical-align: top; font-weight: 800; font-size: 12px;">₹${price.toFixed(2)}</td>
+        <td style="text-align: right; padding: 4px 0; vertical-align: top; font-weight: 900; font-size: 12.5px;">₹${lineTotal.toFixed(2)}</td>
       </tr>
     `;
   }).join('');
@@ -263,48 +307,54 @@ export const printBill = (bill, restaurant = {}) => {
           size: 80mm auto;
         }
         body {
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 10px;
-          line-height: 1.3;
+          font-family: 'Segoe UI', Arial, 'Courier New', monospace, sans-serif;
+          font-size: 12px;
+          font-weight: 700;
+          line-height: 1.35;
           color: #000;
           background: #fff;
           margin: 0;
-          padding: 8px;
-          width: 72mm;
+          padding: 8px 6px;
+          width: 74mm;
         }
         .header {
           text-align: center;
           margin-bottom: 8px;
         }
         .restaurant-name {
-          font-size: 14px;
+          font-size: 16px;
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          margin-bottom: 2px;
+          margin-bottom: 3px;
         }
         .meta-info {
-          font-size: 9px;
-          margin-bottom: 1px;
+          font-size: 11px;
+          font-weight: 700;
+          color: #000;
+          margin-bottom: 2px;
         }
         .bill-title {
-          font-size: 11px;
-          font-weight: bold;
-          margin: 6px 0 3px 0;
-          border-top: 1px dashed #000;
-          border-bottom: 1px dashed #000;
-          padding: 3px 0;
+          font-size: 13px;
+          font-weight: 900;
+          margin: 8px 0 5px 0;
+          border-top: 1.5px dashed #000;
+          border-bottom: 1.5px dashed #000;
+          padding: 4px 0;
           text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
         .order-info {
           display: flex;
           justify-content: space-between;
-          font-size: 9px;
-          margin-bottom: 4px;
+          font-size: 12px;
+          font-weight: 800;
+          color: #000;
+          margin-bottom: 3px;
         }
         .divider {
-          border-bottom: 1px dashed #000;
-          margin: 4px 0;
+          border-bottom: 1.5px dashed #000;
+          margin: 6px 0;
         }
         .double-divider {
           border-bottom: 2px solid #000;
@@ -313,37 +363,52 @@ export const printBill = (bill, restaurant = {}) => {
         table {
           width: 100%;
           border-collapse: collapse;
-          font-size: 9.5px;
+          font-size: 12px;
         }
         th {
-          border-bottom: 1px solid #000;
-          padding: 3px 0;
+          border-bottom: 1.5px solid #000;
+          padding: 4px 0;
           text-align: left;
-          font-weight: bold;
+          font-weight: 900;
+          font-size: 12px;
         }
         .totals-table {
           width: 100%;
-          margin-top: 4px;
+          margin-top: 6px;
+          border-top: 1.5px dashed #000;
+          padding-top: 4px;
         }
         .totals-table td {
-          padding: 2px 0;
+          padding: 3px 0;
+          font-size: 12px;
+          font-weight: 800;
+          color: #000;
         }
         .grand-total {
-          font-size: 13px;
-          font-weight: 900;
+          font-size: 15px !important;
+          font-weight: 900 !important;
+        }
+        .grand-total td {
+          font-size: 15px !important;
+          font-weight: 900 !important;
+          border-top: 2px solid #000;
+          border-bottom: 2px solid #000;
+          padding: 5px 0 !important;
         }
         .payment-box {
-          border: 1px solid #000;
-          padding: 4px;
+          border: 1.5px solid #000;
+          padding: 5px;
           text-align: center;
-          margin: 6px 0;
-          font-weight: bold;
-          font-size: 9px;
+          margin: 8px 0;
+          font-weight: 900;
+          font-size: 11px;
         }
         .footer {
           text-align: center;
-          font-size: 8.5px;
-          margin-top: 6px;
+          font-size: 11px;
+          font-weight: 800;
+          margin-top: 8px;
+          color: #000;
         }
       </style>
     </head>
@@ -351,14 +416,14 @@ export const printBill = (bill, restaurant = {}) => {
       <div class="header">
         <div class="restaurant-name">${restaurantName}</div>
         ${address ? `<div class="meta-info">${address}</div>` : ''}
-        ${phone ? `<div class="meta-info">Ph: ${phone}</div>` : ''}
-        ${gstin ? `<div class="meta-info">GSTIN: ${gstin}</div>` : ''}
+        ${phone ? `<div class="meta-info"><strong>Ph:</strong> ${phone}</div>` : ''}
+        ${gstin ? `<div class="meta-info"><strong>GSTIN:</strong> ${gstin}</div>` : ''}
         
         <div class="bill-title">TAX INVOICE / RECEIPT</div>
       </div>
 
       <div class="order-info">
-        <div><strong>Bill:</strong> ${billNum}</div>
+        <div><strong>Bill #:</strong> ${billNum}</div>
         <div><strong>Table:</strong> ${tableNum}</div>
       </div>
       <div class="order-info">
@@ -370,8 +435,8 @@ export const printBill = (bill, restaurant = {}) => {
       <table>
         <thead>
           <tr>
-            <th style="width: 45%;">ITEM</th>
-            <th style="text-align: center; width: 15%;">QTY</th>
+            <th style="width: 46%;">ITEM</th>
+            <th style="text-align: center; width: 14%;">QTY</th>
             <th style="text-align: right; width: 20%;">RATE</th>
             <th style="text-align: right; width: 20%;">AMT</th>
           </tr>
@@ -383,39 +448,38 @@ export const printBill = (bill, restaurant = {}) => {
 
       <table class="totals-table">
         <tr>
-          <td>Subtotal:</td>
-          <td style="text-align: right;">₹${subtotal.toFixed(2)}</td>
+          <td><strong>Subtotal:</strong></td>
+          <td style="text-align: right;"><strong>₹${subtotal.toFixed(2)}</strong></td>
         </tr>
         <tr>
-          <td>GST (${gstRate}%):</td>
-          <td style="text-align: right;">₹${gst.toFixed(2)}</td>
+          <td><strong>GST (${gstRate}%):</strong></td>
+          <td style="text-align: right;"><strong>₹${gst.toFixed(2)}</strong></td>
         </tr>
         ${discount > 0 ? `
         <tr>
-          <td>Discount:</td>
-          <td style="text-align: right;">-₹${discount.toFixed(2)}</td>
+          <td><strong>Discount:</strong></td>
+          <td style="text-align: right;"><strong>-₹${discount.toFixed(2)}</strong></td>
         </tr>
         ` : ''}
         ${Math.abs(roundOff) >= 0.01 ? `
         <tr>
-          <td>Round Off:</td>
-          <td style="text-align: right;">${roundOff > 0 ? `+₹${roundOff.toFixed(2)}` : `-₹${Math.abs(roundOff).toFixed(2)}`}</td>
+          <td><strong>Round Off:</strong></td>
+          <td style="text-align: right;"><strong>${roundOff > 0 ? `+₹${roundOff.toFixed(2)}` : `-₹${Math.abs(roundOff).toFixed(2)}`}</strong></td>
         </tr>
         ` : ''}
         <tr class="grand-total">
-          <td style="border-top: 1px solid #000; padding-top: 4px;">TOTAL DUE:</td>
-          <td style="text-align: right; border-top: 1px solid #000; padding-top: 4px;">₹${total.toFixed(2)}</td>
+          <td>TOTAL DUE:</td>
+          <td style="text-align: right;">₹${total.toFixed(2)}</td>
         </tr>
       </table>
 
       <div class="payment-box">
-        PAYMENT MODE: ${paymentMethod} | STATUS: ${paymentStatus}
+        PAYMENT: ${paymentMethod} | STATUS: ${paymentStatus}
       </div>
-
 
       <div class="footer">
         <div>Thank you for dining with us!</div>
-        <div style="font-weight: bold; margin-top: 2px;">Please Visit Again</div>
+        <div style="margin-top: 3px; font-weight: 900;">Please Visit Again</div>
       </div>
     </body>
     </html>

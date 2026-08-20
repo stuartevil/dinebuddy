@@ -130,22 +130,31 @@ export const POSScreen = () => {
     const selectedOpts = Object.values(selectedAddons || {}).flat().filter(Boolean);
     const addonsPrice = selectedOpts.reduce((sum, o) => sum + (parseFloat(o?.price || 0)), 0);
     const unitPrice = basePrice + addonsPrice;
-    const addonsText = selectedOpts.map(o => o?.name).filter(Boolean).join(', ');
+    
+    // Format add-ons title with individual prices
+    const addonsDetails = selectedOpts.map(o => {
+      const p = parseFloat(o?.price || 0);
+      return p > 0 ? `${o?.name} (+₹${p.toFixed(2)})` : o?.name;
+    }).filter(Boolean).join(', ');
+
     const cartItemId = `${customizingDish.id}-${selectedOpts.map(o => o?.id).sort().join('-')}`;
 
     setCart(prev => {
-      const exists = prev.find(i => i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsText ? `(${addonsText})` : '')));
+      const exists = prev.find(i => i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsDetails ? `(${addonsDetails})` : '')));
       if (exists) {
-        return prev.map(i => (i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsText ? `(${addonsText})` : ''))) ? { ...i, qty: i.qty + (customizingQty || 1) } : i);
+        return prev.map(i => (i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsDetails ? `(${addonsDetails})` : ''))) ? { ...i, qty: i.qty + (customizingQty || 1) } : i);
       }
       return [...prev, {
         cartItemId,
         id: customizingDish.id,
         name: customizingDish.name,
+        basePrice,
+        addonsPrice,
         price: unitPrice,
         qty: customizingQty || 1,
-        addonsTitle: addonsText ? `(${addonsText})` : '',
-        note: addonsText ? `Add-ons: ${addonsText}` : ''
+        addonsTitle: addonsDetails ? `(${addonsDetails})` : '',
+        note: addonsDetails ? `Add-ons: ${addonsDetails}` : '',
+        selectedOpts: selectedOpts.map(o => ({ id: o.id, name: o.name, price: parseFloat(o.price || 0) }))
       }];
     });
 
@@ -543,8 +552,10 @@ export const POSScreen = () => {
                     <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-primary)' }}>₹{(Number(item.price || 0) * Number(item.qty || 1)).toFixed(2)}</span>
                   </div>
                   {item.addonsTitle && (
-                    <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
-                      {item.addonsTitle}
+                    <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
+                      <span className="badge badge-info" style={{ fontSize: '0.68rem', padding: '0.1rem 0.4rem' }}>
+                        ✨ {item.addonsTitle.replace(/^\(|\)$/g, '')}
+                      </span>
                     </div>
                   )}
 

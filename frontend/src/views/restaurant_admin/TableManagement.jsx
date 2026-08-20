@@ -221,12 +221,18 @@ export const TableManagement = () => {
     const selectedOpts = Object.values(selectedAddons || {}).flat().filter(Boolean);
     const addonsPrice = selectedOpts.reduce((sum, o) => sum + (parseFloat(o?.price || 0)), 0);
     const unitPrice = basePrice + addonsPrice;
-    const addonsText = selectedOpts.map(o => o?.name).filter(Boolean).join(', ');
+    
+    // Format add-ons title with individual prices
+    const addonsDetails = selectedOpts.map(o => {
+      const p = parseFloat(o?.price || 0);
+      return p > 0 ? `${o?.name} (+₹${p.toFixed(2)})` : o?.name;
+    }).filter(Boolean).join(', ');
+
     const cartItemId = `${customizingDish.id}-${selectedOpts.map(o => o?.id).sort().join('-')}`;
 
     setTableOrders(prev => {
       const currentList = prev[selectedTable.id] || [];
-      const existsIndex = currentList.findIndex(i => i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsText ? `(${addonsText})` : '')));
+      const existsIndex = currentList.findIndex(i => i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsDetails ? `(${addonsDetails})` : '')));
       let updated;
       if (existsIndex >= 0) {
         updated = currentList.map((i, idx) => idx === existsIndex ? { ...i, qty: i.qty + customizingQty } : i);
@@ -237,11 +243,13 @@ export const TableManagement = () => {
             cartItemId,
             id: customizingDish.id,
             name: customizingDish.name,
+            basePrice,
+            addonsPrice,
             price: unitPrice,
             qty: customizingQty,
-            addonsTitle: addonsText ? `(${addonsText})` : '',
-            note: addonsText ? `Add-ons: ${addonsText}` : '',
-            selectedOpts
+            addonsTitle: addonsDetails ? `(${addonsDetails})` : '',
+            note: addonsDetails ? `Add-ons: ${addonsDetails}` : '',
+            selectedOpts: selectedOpts.map(o => ({ id: o.id, name: o.name, price: parseFloat(o.price || 0) }))
           }
         ];
       }
@@ -252,7 +260,7 @@ export const TableManagement = () => {
       handleUpdateStatus(selectedTable.id, 'occupied');
     }
 
-    addToast('success', 'Customized Item Added', `${customizingQty}x ${customizingDish.name} ${addonsText ? `(${addonsText})` : ''} added to ${selectedTable.table_number}`);
+    addToast('success', 'Customized Item Added', `${customizingQty}x ${customizingDish.name} ${addonsDetails ? `(${addonsDetails})` : ''} added to ${selectedTable.table_number}`);
     setCustomizingDish(null);
     setCustomizingGroups([]);
     setSelectedAddons({});
@@ -282,7 +290,8 @@ export const TableManagement = () => {
       items: items.map(i => ({
         ...i,
         quantity: i.qty,
-        special_instructions: i.note || i.addonsTitle || ''
+        special_instructions: i.note || i.addonsTitle || '',
+        selectedOpts: i.selectedOpts || []
       }))
     };
     printKOT(orderData, selectedRestaurant || {});
@@ -308,7 +317,8 @@ export const TableManagement = () => {
       items: items.map(i => ({
         ...i,
         quantity: i.qty,
-        special_instructions: i.note || i.addonsTitle || ''
+        special_instructions: i.note || i.addonsTitle || '',
+        selectedOpts: i.selectedOpts || []
       })),
       subtotal,
       gst,

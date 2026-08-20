@@ -299,26 +299,35 @@ export const CustomerQRApp = () => {
   const handleConfirmCustomization = () => {
     if (!customizingDish) return;
     const basePrice = parseFloat(customizingDish.price || 0);
-    const selectedOpts = Object.values(selectedAddons).flat();
+    const selectedOpts = Object.values(selectedAddons).flat().filter(Boolean);
     const addonsPrice = selectedOpts.reduce((sum, o) => sum + (parseFloat(o.price || 0)), 0);
     const unitPrice = basePrice + addonsPrice;
-    const addonsText = selectedOpts.map(o => o.name).join(', ');
+    
+    // Format add-ons title with individual prices
+    const addonsDetails = selectedOpts.map(o => {
+      const p = parseFloat(o?.price || 0);
+      return p > 0 ? `${o?.name} (+₹${p.toFixed(2)})` : o?.name;
+    }).filter(Boolean).join(', ');
+
     const cartItemId = `${customizingDish.id}_${selectedOpts.map(o => o.id).sort().join('_')}`;
 
     setCart(prev => {
-      const exists = prev.find(i => i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsText ? `(${addonsText})` : '')));
+      const exists = prev.find(i => i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsDetails ? `(${addonsDetails})` : '')));
       if (exists) {
-        return prev.map(i => (i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsText ? `(${addonsText})` : ''))) ? { ...i, qty: i.qty + customizingQty } : i);
+        return prev.map(i => (i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsDetails ? `(${addonsDetails})` : ''))) ? { ...i, qty: i.qty + customizingQty } : i);
       }
       return [...prev, {
         ...customizingDish,
         cartItemId,
         id: customizingDish.id,
         name: customizingDish.name,
+        basePrice,
+        addonsPrice,
         price: unitPrice,
         qty: customizingQty,
-        addonsTitle: addonsText ? `(${addonsText})` : '',
-        note: addonsText ? `Add-ons: ${addonsText}` : ''
+        addonsTitle: addonsDetails ? `(${addonsDetails})` : '',
+        note: addonsDetails ? `Add-ons: ${addonsDetails}` : '',
+        selectedOpts: selectedOpts.map(o => ({ id: o.id, name: o.name, price: parseFloat(o.price || 0) }))
       }];
     });
     setCustomizingDish(null);
