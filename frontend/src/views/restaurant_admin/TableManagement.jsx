@@ -17,7 +17,10 @@ import {
   Printer,
   Sparkles,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Search,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 
 export const TableManagement = () => {
@@ -39,6 +42,10 @@ export const TableManagement = () => {
 
   // Add Order item state inside Selected Table Modal
   const [selectedItemForm, setSelectedItemForm] = useState({ item_id: '', qty: 1 });
+  const [dishSearch, setDishSearch] = useState('');
+  const [isDishDropdownOpen, setIsDishDropdownOpen] = useState(false);
+  const dishDropdownRef = useRef(null);
+
   const [addingOrder, setAddingOrder] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
 
@@ -53,6 +60,17 @@ export const TableManagement = () => {
   useEffect(() => {
     selectedTableRef.current = selectedTable;
   }, [selectedTable]);
+
+  // Click outside to close searchable dish dropdown
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dishDropdownRef.current && !dishDropdownRef.current.contains(e.target)) {
+        setIsDishDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch live bill for a specific table
   const fetchTableLiveBill = async (tableId, showSpinner = false) => {
@@ -91,11 +109,12 @@ export const TableManagement = () => {
       setTables(tblList);
       setMenuItems(itemList);
 
-      if (itemList.length > 0) {
+      if (itemList.length > 0 && !selectedItemForm.item_id) {
         setSelectedItemForm(f => ({
           ...f,
-          item_id: f.item_id || itemList[0].id
+          item_id: itemList[0].id
         }));
+        setDishSearch(itemList[0].name);
       }
 
       // Update selected table object reference if currently open
@@ -155,6 +174,10 @@ export const TableManagement = () => {
   const handleSelectTable = (tbl) => {
     setSelectedTable(tbl);
     fetchTableLiveBill(tbl.id, true);
+    if (menuItems.length > 0 && !selectedItemForm.item_id) {
+      setSelectedItemForm({ item_id: menuItems[0].id, qty: 1 });
+      setDishSearch(menuItems[0].name);
+    }
   };
 
   // Create new Table in DB
@@ -238,14 +261,31 @@ export const TableManagement = () => {
     }
   };
 
+  // Filtered dishes for Searchable Dropdown
+  const filteredDishes = menuItems.filter(item => {
+    const q = (dishSearch || '').toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (item.name || '').toLowerCase().includes(q) ||
+      (item.description || '').toLowerCase().includes(q) ||
+      String(item.price || '').includes(q)
+    );
+  });
+
   // Add Item / Open Customization when clicking Add to Bill
   const handleAddItemToTableOrder = async (e) => {
     if (e) e.preventDefault();
     if (!selectedTable || !selectedRestaurant) return;
 
-    const item = menuItems.find(m => m.id === Number(selectedItemForm.item_id));
+    let item = menuItems.find(m => Number(m.id) === Number(selectedItemForm.item_id));
+    if (!item && filteredDishes.length > 0) {
+      item = filteredDishes[0];
+      setSelectedItemForm(f => ({ ...f, item_id: item.id }));
+      setDishSearch(item.name);
+    }
+
     if (!item) {
-      addToast('error', 'Invalid Item', 'Select a valid menu dish.');
+      addToast('error', 'Select a Dish', 'Please select or search a menu dish to add.');
       return;
     }
 
@@ -634,44 +674,162 @@ export const TableManagement = () => {
               ))}
             </div>
 
-            {/* Add Order Item Form for this Table */}
+            {/* Add Order Item Form for this Table with Searchable Combobox */}
             <div style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
               <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Plus size={16} /> Add Dish to {selectedTable.table_number} Bill
+                <Plus size={16} /> Search & Add Dish to {selectedTable.table_number} Bill
               </h4>
               {menuItems.length === 0 ? (
                 <div style={{ fontSize: '0.8rem', color: 'var(--warning)' }}>
                   ⚠ No menu dishes available. Add dishes in Menu Management first.
                 </div>
               ) : (
-                <form onSubmit={handleAddItemToTableOrder} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <select
-                    value={selectedItemForm.item_id}
-                    onChange={(e) => setSelectedItemForm({ ...selectedItemForm, item_id: e.target.value })}
-                    className="select-control"
-                    style={{ flex: 1, minWidth: '180px' }}
-                  >
-                    {menuItems.map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} — ₹{parseFloat(item.price || 0).toFixed(2)}
-                      </option>
-                    ))}
-                  </select>
+                <form onSubmit={handleAddItemToTableOrder} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
+                  {/* Searchable Combobox Input */}
+                  <div ref={dishDropdownRef} style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        background: 'var(--bg-primary)',
+                        border: isDishDropdownOpen ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '0.5rem 0.75rem',
+                        gap: '0.5rem',
+                        cursor: 'text',
+                        boxShadow: isDishDropdownOpen ? '0 0 10px var(--accent-glow)' : 'none',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={() => setIsDishDropdownOpen(true)}
+                    >
+                      <Search size={15} color={isDishDropdownOpen ? "var(--accent-primary)" : "var(--text-muted)"} />
+                      <input
+                        type="text"
+                        placeholder="Search dish by name / price..."
+                        value={dishSearch}
+                        onChange={(e) => {
+                          setDishSearch(e.target.value);
+                          setIsDishDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsDishDropdownOpen(true)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          outline: 'none',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          width: '100%'
+                        }}
+                      />
+                      {dishSearch && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDishSearch('');
+                            setIsDishDropdownOpen(true);
+                          }}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                      <ChevronDown size={15} color="var(--text-muted)" style={{ transform: isDishDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease', cursor: 'pointer' }} />
+                    </div>
+
+                    {/* Search Matches Dropdown Menu */}
+                    {isDishDropdownOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 4px)',
+                          left: 0,
+                          right: 0,
+                          background: 'var(--bg-secondary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: 'var(--radius-md)',
+                          boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                          maxHeight: '230px',
+                          overflowY: 'auto',
+                          zIndex: 1200
+                        }}
+                      >
+                        {filteredDishes.length === 0 ? (
+                          <div style={{ padding: '0.85rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            No dishes found matching "{dishSearch}"
+                          </div>
+                        ) : (
+                          filteredDishes.map(item => {
+                            const isSelected = String(item.id) === String(selectedItemForm.item_id);
+                            return (
+                              <div
+                                key={item.id}
+                                onClick={() => {
+                                  setSelectedItemForm(f => ({ ...f, item_id: item.id }));
+                                  setDishSearch(item.name);
+                                  setIsDishDropdownOpen(false);
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '0.65rem 0.85rem',
+                                  borderBottom: '1px solid var(--border-color)',
+                                  cursor: 'pointer',
+                                  background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                                  transition: 'background 0.15s ease'
+                                }}
+                                onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                                onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: isSelected ? 800 : 600, color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                                    {item.name}
+                                  </span>
+                                  {item.is_veg !== undefined && (
+                                    <span
+                                      style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: item.is_veg ? '#22c55e' : '#ef4444',
+                                        display: 'inline-block'
+                                      }}
+                                      title={item.is_veg ? 'Vegetarian' : 'Non-Vegetarian'}
+                                    ></span>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--success)' }}>
+                                    ₹{parseFloat(item.price || 0).toFixed(2)}
+                                  </span>
+                                  {isSelected && <Check size={14} color="var(--accent-primary)" />}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quantity Stepper */}
                   <input
                     type="number"
                     min="1"
                     className="input-control"
-                    style={{ width: '70px' }}
+                    style={{ width: '70px', height: '38px' }}
                     value={selectedItemForm.qty}
                     onChange={(e) => setSelectedItemForm({ ...selectedItemForm, qty: e.target.value })}
                   />
 
+                  {/* Add to Bill Action Button */}
                   <button
                     type="submit"
                     className="btn btn-primary btn-sm"
                     disabled={loadingAddons || addingOrder}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                    style={{ height: '38px', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0 1rem' }}
                   >
                     {loadingAddons || addingOrder ? (
                       <>
@@ -735,7 +893,7 @@ export const TableManagement = () => {
                 <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                   <p style={{ margin: '0 0 0.5rem 0' }}>No dishes ordered yet for {selectedTable.table_number}.</p>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
-                    When a customer orders via QR code, dishes will automatically appear here live. Or add a dish above.
+                    When a customer orders via QR code, dishes will automatically appear here live. Or search and add dishes above.
                   </p>
                 </div>
               ) : (
