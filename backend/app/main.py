@@ -29,8 +29,18 @@ async def lifespan(app: FastAPI):
         import app.models  # load all models for metadata
         Base.metadata.create_all(bind=engine)
         print("✅ Database tables created/verified successfully.")
+
+        # Ensure missing columns exist on production DB without manual migration
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("""
+                ALTER TABLE restaurant_settings 
+                ADD COLUMN IF NOT EXISTS disable_default_categories BOOLEAN DEFAULT FALSE NOT NULL;
+            """))
+            conn.commit()
+            print("✅ Verified/Added disable_default_categories column in restaurant_settings.")
     except Exception as e:
-        print(f"⚠️ Table creation warning: {e}")
+        print(f"⚠️ Table creation/alter warning: {e}")
 
     yield
     

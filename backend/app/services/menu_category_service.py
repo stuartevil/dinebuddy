@@ -62,13 +62,20 @@ class MenuCategoryService:
     ) -> list[MenuCategory]:
         from app.models.restaurant_settings import RestaurantSettings
 
-        settings = (
-            db.query(RestaurantSettings)
-            .filter(RestaurantSettings.restaurant_id == restaurant_id)
-            .first()
-        )
+        disable_default = False
+        try:
+            settings = (
+                db.query(RestaurantSettings)
+                .filter(RestaurantSettings.restaurant_id == restaurant_id)
+                .first()
+            )
+            if settings and getattr(settings, "disable_default_categories", False):
+                disable_default = True
+        except Exception as e:
+            print(f"Warning fetching restaurant settings in category list: {e}")
+            disable_default = False
 
-        if settings and settings.disable_default_categories:
+        if disable_default:
             return (
                 db.query(MenuCategory)
                 .filter(
