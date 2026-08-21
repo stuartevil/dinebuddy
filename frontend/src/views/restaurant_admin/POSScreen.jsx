@@ -234,29 +234,51 @@ export const POSScreen = () => {
     printBill(billData, { ...selectedRestaurant, tax_rate: taxRate });
   };
 
+  // Resolve table ID accurately for Takeaway vs Dining Tables
+  const resolveTargetTableId = async () => {
+    if (!selectedRestaurant) return null;
+
+    if (selectedTable !== 'Takeaway') {
+      const matched = tables.find(t => String(t.id) === String(selectedTable) || t.table_number === selectedTable);
+      if (matched) return matched.id;
+    }
+
+    // For Takeaway: strictly find or create dedicated Takeaway Counter table
+    const existingTakeaway = tables.find(t => (t.table_number || '').toLowerCase().includes('takeaway'));
+    if (existingTakeaway) return existingTakeaway.id;
+
+    try {
+      const res = await api.get(`/tables/restaurant/${selectedRestaurant.id}`);
+      const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      const found = list.find(t => (t.table_number || '').toLowerCase().includes('takeaway'));
+      if (found) {
+        setTables(list);
+        return found.id;
+      }
+
+      // Create dedicated Takeaway Counter table in DB (hidden from Floor Plan)
+      const newTableRes = await api.post('/tables/', {
+        restaurant_id: selectedRestaurant.id,
+        table_number: 'Takeaway Counter',
+        capacity: 10
+      });
+      if (newTableRes.data?.id) {
+        setTables(prev => [...prev, newTableRes.data]);
+        return newTableRes.data.id;
+      }
+    } catch (err) {
+      console.error("Takeaway table resolution error:", err);
+    }
+    return null;
+  };
+
   const handleSendToKitchen = async () => {
     if (cart.length === 0 || !selectedRestaurant) return;
 
     try {
-      let targetTableId = null;
-
-      if (selectedTable !== 'Takeaway') {
-        const matched = tables.find(t => String(t.id) === String(selectedTable) || t.table_number === selectedTable);
-        if (matched) targetTableId = matched.id;
-      }
-
-      if (!targetTableId && tables.length > 0) {
-        targetTableId = tables[0].id;
-      }
-
+      const targetTableId = await resolveTargetTableId();
       if (!targetTableId) {
-        const newTableRes = await api.post('/tables/', {
-          restaurant_id: selectedRestaurant.id,
-          table_number: 'Takeaway Counter',
-          capacity: 10
-        });
-        targetTableId = newTableRes.data.id;
-        setTables([newTableRes.data]);
+        throw new Error("Could not determine table for this order.");
       }
 
       const orderPayload = {
@@ -292,25 +314,9 @@ export const POSScreen = () => {
     if (cart.length === 0 || !selectedRestaurant) return;
 
     try {
-      let targetTableId = null;
-
-      if (selectedTable !== 'Takeaway') {
-        const matched = tables.find(t => String(t.id) === String(selectedTable) || t.table_number === selectedTable);
-        if (matched) targetTableId = matched.id;
-      }
-
-      if (!targetTableId && tables.length > 0) {
-        targetTableId = tables[0].id;
-      }
-
+      const targetTableId = await resolveTargetTableId();
       if (!targetTableId) {
-        const newTableRes = await api.post('/tables/', {
-          restaurant_id: selectedRestaurant.id,
-          table_number: 'Takeaway Counter',
-          capacity: 10
-        });
-        targetTableId = newTableRes.data.id;
-        setTables([newTableRes.data]);
+        throw new Error("Could not determine table for this order.");
       }
 
       // If KOT was not sent earlier, save order now

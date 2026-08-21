@@ -116,8 +116,8 @@ export const TableManagement = () => {
         }
       }
 
-      // Fetch running bills for all occupied tables
-      const occupiedTables = tblList.filter(t => t.status === 'occupied');
+      // Fetch running bills for all occupied dining floor tables
+      const occupiedTables = tblList.filter(t => t.status === 'occupied' && !(t.table_number || '').toLowerCase().includes('takeaway'));
       if (occupiedTables.length > 0) {
         const billsMap = {};
         await Promise.all(
@@ -459,7 +459,10 @@ export const TableManagement = () => {
     return 0.0;
   };
 
-  const floorTables = tables.filter(t => !(t.table_number || '').toLowerCase().includes('takeaway'));
+  const floorTables = tables.filter(t => {
+    const name = (t.table_number || '').toLowerCase().trim();
+    return !name.includes('takeaway');
+  });
 
   const availableCount = floorTables.filter(t => t.status === 'available').length;
   const occupiedCount = floorTables.filter(t => t.status === 'occupied').length;
