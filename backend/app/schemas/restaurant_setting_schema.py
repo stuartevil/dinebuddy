@@ -4,14 +4,14 @@ from typing import Optional
 class RestaurantSettingsRead(BaseModel):
     tax_percentage: Optional[float] = None
     service_charge: Optional[float] = None
-    auto_accept_orders: bool
+    auto_accept_orders: bool = False
     order_preparation_time: Optional[int] = None
+    disable_default_categories: bool = False
 
     class Config:
         from_attributes = True
 
 class RestaurantRead(BaseModel):
-    # existing fields...
     settings: Optional[RestaurantSettingsRead] = None
 
 
@@ -20,3 +20,4 @@ class RestaurantSettingsUpdateRequest(BaseModel):
     service_charge: Optional[float] = Field(None, ge=0, le=100)
     auto_accept_orders: Optional[bool] = None
     order_preparation_time: Optional[int] = Field(None, ge=1, le=240)
+    disable_default_categories: Optional[bool] = None

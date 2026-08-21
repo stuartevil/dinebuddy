@@ -60,6 +60,25 @@ class MenuCategoryService:
         db: Session,
         restaurant_id: int,
     ) -> list[MenuCategory]:
+        from app.models.restaurant_settings import RestaurantSettings
+
+        settings = (
+            db.query(RestaurantSettings)
+            .filter(RestaurantSettings.restaurant_id == restaurant_id)
+            .first()
+        )
+
+        if settings and settings.disable_default_categories:
+            return (
+                db.query(MenuCategory)
+                .filter(
+                    MenuCategory.is_active.is_(True),
+                    MenuCategory.restaurant_id == restaurant_id,
+                )
+                .order_by(MenuCategory.display_order)
+                .all()
+            )
+
         return (
             db.query(MenuCategory)
             .filter(

@@ -43,6 +43,7 @@ class RestaurantSettingsService:
         settings = RestaurantSettings(
             restaurant_id=restaurant_id,
             auto_accept_orders=False,
+            disable_default_categories=False,
         )
 
         db.add(settings)

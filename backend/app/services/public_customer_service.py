@@ -126,13 +126,23 @@ class PublicCustomerService:
         restaurant = PublicCustomerService._resolve_restaurant(db, restaurant_identifier)
         table = PublicCustomerService._resolve_table_in_restaurant(db, restaurant.id, table_identifier)
 
-        categories = (
-            db.query(MenuCategory)
-            .filter(
-                (MenuCategory.restaurant_id == restaurant.id) | (MenuCategory.is_global == True)
+        settings = db.query(RestaurantSettings).filter(RestaurantSettings.restaurant_id == restaurant.id).first()
+        disable_default = bool(settings and settings.disable_default_categories)
+
+        if disable_default:
+            categories = (
+                db.query(MenuCategory)
+                .filter(MenuCategory.restaurant_id == restaurant.id)
+                .all()
             )
-            .all()
-        )
+        else:
+            categories = (
+                db.query(MenuCategory)
+                .filter(
+                    (MenuCategory.restaurant_id == restaurant.id) | (MenuCategory.is_global == True)
+                )
+                .all()
+            )
 
         items = (
             db.query(MenuItem)
@@ -143,7 +153,6 @@ class PublicCustomerService:
             .all()
         )
 
-        settings = db.query(RestaurantSettings).filter(RestaurantSettings.restaurant_id == restaurant.id).first()
         tax_pct = float(settings.tax_percentage) if (settings and settings.tax_percentage is not None) else 5.0
 
         return {

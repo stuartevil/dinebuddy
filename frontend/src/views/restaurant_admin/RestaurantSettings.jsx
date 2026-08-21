@@ -55,10 +55,20 @@ export const RestaurantSettings = () => {
       // Fetch settings from backend database
       api.get(`/restaurants/${selectedRestaurant.id}/settings`)
         .then(res => {
-          if (res.data && res.data.tax_percentage !== undefined && res.data.tax_percentage !== null) {
-            const fetchedTax = String(res.data.tax_percentage);
-            setForm(prev => ({ ...prev, tax_rate: fetchedTax }));
+          if (res.data) {
+            const fetchedTax = (res.data.tax_percentage !== undefined && res.data.tax_percentage !== null)
+              ? String(res.data.tax_percentage)
+              : (savedLocalTax !== null ? savedLocalTax : '5');
+            const disableDefault = Boolean(res.data.disable_default_categories);
+
+            setForm(prev => ({
+              ...prev,
+              tax_rate: fetchedTax,
+              disable_preset_menu_categories: disableDefault
+            }));
+
             localStorage.setItem(`dinebuddy_tax_rate_${selectedRestaurant.id}`, fetchedTax);
+            localStorage.setItem('dinebuddy_disable_default_menu_categories', disableDefault ? 'true' : 'false');
           }
         })
         .catch(err => {
@@ -105,13 +115,15 @@ export const RestaurantSettings = () => {
           logo_url: updatedLogoUrl,
         });
 
-        // Save GST Tax Percentage to backend database settings
+        // Save GST Tax Percentage and Disable Default Categories to backend database settings
         const parsedTax = parseFloat(form.tax_rate) || 0.0;
         await api.patch(`/restaurants/${selectedRestaurant.id}/settings`, {
-          tax_percentage: parsedTax
+          tax_percentage: parsedTax,
+          disable_default_categories: Boolean(form.disable_preset_menu_categories)
         });
 
         localStorage.setItem(`dinebuddy_tax_rate_${selectedRestaurant.id}`, form.tax_rate);
+        localStorage.setItem('dinebuddy_disable_default_menu_categories', form.disable_preset_menu_categories ? 'true' : 'false');
 
         if (fetchRestaurants) fetchRestaurants();
       } catch (err) {
@@ -119,7 +131,7 @@ export const RestaurantSettings = () => {
       }
     }
 
-    addToast('success', 'GST Tax & Restaurant Settings Saved', `Default GST rate updated to ${form.tax_rate}%! Billing and POS calculations updated.`);
+    addToast('success', 'Restaurant Settings & Preferences Saved', `Settings and Default Menu Categories preferences permanently saved to database!`);
   };
 
   return (
