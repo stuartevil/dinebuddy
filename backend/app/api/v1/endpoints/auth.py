@@ -7,10 +7,12 @@ from app.services.user_service import login_user, refresh_tokens
 from app.core.database import get_db
 from app.core.security import hash_password
 
+from app.core.rate_limiter import login_rate_limiter
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=Token, dependencies=[Depends(login_rate_limiter)])
 def login(
     payload: UserLogin,
     db: Session = Depends(get_db),

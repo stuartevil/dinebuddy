@@ -11,6 +11,7 @@ from app.schemas.public_customer_schema import (
 )
 from app.schemas.order import OrderResponse
 from app.services.public_customer_service import PublicCustomerService
+from app.core.rate_limiter import public_order_rate_limiter
 
 router = APIRouter(prefix="/public", tags=["Public Customer QR"])
 
@@ -57,7 +58,7 @@ def get_public_restaurant_table_and_menu(
     return PublicCustomerService.get_restaurant_table_and_menu_info(db, restaurant_id, table_id)
 
 
-@router.post("/restaurants/{restaurant_id}/tables/{table_id}/order", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/restaurants/{restaurant_id}/tables/{table_id}/order", response_model=OrderResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(public_order_rate_limiter)])
 def place_public_restaurant_table_order(
     restaurant_id: str,
     table_id: str,
@@ -115,7 +116,7 @@ def get_public_table_and_menu(table_id: str, db: Session = Depends(get_db)):
     return PublicCustomerService.get_table_and_menu_info(db, table_id)
 
 
-@router.post("/tables/{table_id}/order", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/tables/{table_id}/order", response_model=OrderResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(public_order_rate_limiter)])
 def place_public_customer_order(
     table_id: str,
     payload: PublicCustomerOrderPayload,
