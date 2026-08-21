@@ -27,6 +27,11 @@ menu_category_service = MenuCategoryService()
 # CREATE MENU CATEGORY
 # =========================================================
 @router.post(
+    "",
+    response_model=MenuCategoryRead,
+    status_code=status.HTTP_201_CREATED,
+)
+@router.post(
     "/",
     response_model=MenuCategoryRead,
     status_code=status.HTTP_201_CREATED,
@@ -49,6 +54,10 @@ def create_menu_category(
 # =========================================================
 # LIST MENU CATEGORIES
 # =========================================================
+@router.get(
+    "",
+    response_model=List[MenuCategoryRead],
+)
 @router.get(
     "/",
     response_model=List[MenuCategoryRead],

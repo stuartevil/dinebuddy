@@ -46,9 +46,18 @@ export const MenuManagement = () => {
     const restId = selectedRestaurant.id;
 
     Promise.all([
-      api.get(`/restaurants/${restId}/menu-categories/`).catch(() => ({ data: [] })),
-      api.get(`/restaurants/${restId}/menu-items/`).catch(() => ({ data: [] })),
-      api.get(`/restaurants/${restId}/addon-groups`).catch(() => ({ data: [] })),
+      api.get(`/restaurants/${restId}/menu-categories`).catch(err => {
+        console.error('Menu categories fetch error:', err);
+        return { data: [] };
+      }),
+      api.get(`/restaurants/${restId}/menu-items/`).catch(err => {
+        console.error('Menu items fetch error:', err);
+        return { data: [] };
+      }),
+      api.get(`/restaurants/${restId}/addon-groups`).catch(err => {
+        console.error('Addon groups fetch error:', err);
+        return { data: [] };
+      }),
     ]).then(([catRes, itemsRes, addonRes]) => {
       const catList = Array.isArray(catRes.data) ? catRes.data : catRes.data?.data || [];
       const itemList = Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data?.data || [];
