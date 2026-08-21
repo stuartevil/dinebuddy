@@ -1,14 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { DEMO_DATA } from '../../services/apiClient';
-import { QrCode, Layers, MonitorPlay, Receipt, CheckCircle, ArrowRight } from 'lucide-react';
+import { api } from '../../services/apiClient';
+import { QrCode, Layers, MonitorPlay, ArrowRight } from 'lucide-react';
 
 export const StaffDashboard = ({ setActiveRoute }) => {
   const { currentUser, selectedRestaurant } = useAuth();
 
-  const openTablesCount = DEMO_DATA.tables.filter(t => t.status === 'occupied').length;
-  const pendingOrdersCount = DEMO_DATA.orders.filter(o => o.status === 'pending').length;
-  const kitchenOrdersCount = DEMO_DATA.orders.filter(o => o.status === 'in_kitchen').length;
+  const [openTablesCount, setOpenTablesCount] = useState(0);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [kitchenOrdersCount, setKitchenOrdersCount] = useState(0);
+
+  useEffect(() => {
+    if (!selectedRestaurant) return;
+    const restId = selectedRestaurant.id;
+
+    Promise.all([
+      api.get(`/tables/restaurant/${restId}`).catch(() => ({ data: [] })),
+      api.get(`/restaurants/${restId}/orders`).catch(() => ({ data: [] }))
+    ]).then(([tablesRes, ordersRes]) => {
+      const tblList = Array.isArray(tablesRes.data) ? tablesRes.data : (tablesRes.data?.data || []);
+      const ordList = Array.isArray(ordersRes.data) ? ordersRes.data : (ordersRes.data?.data || []);
+
+      const occupied = tblList.filter(t => t.status === 'occupied' && !(t.table_number || '').toLowerCase().includes('takeaway')).length;
+      const pending = ordList.filter(o => o.status === 'pending').length;
+      const inKitchen = ordList.filter(o => o.status === 'in_kitchen').length;
+
+      setOpenTablesCount(occupied);
+      setPendingOrdersCount(pending);
+      setKitchenOrdersCount(inKitchen);
+    }).catch(err => {
+      console.error("StaffDashboard fetch metrics error:", err);
+    });
+  }, [selectedRestaurant]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
@@ -16,7 +39,7 @@ export const StaffDashboard = ({ setActiveRoute }) => {
       {/* Greeting Banner */}
       <div className="panel-card" style={{ padding: '2rem', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(19, 27, 46, 0.9))' }}>
         <span className="badge badge-success" style={{ marginBottom: '0.5rem' }}>
-          👨‍🍳 {selectedRestaurant.name} • OPERATIONAL STAFF PORTAL
+          👨‍🍳 {selectedRestaurant?.name || 'Restaurant'} • OPERATIONAL STAFF PORTAL
         </span>
         <h1 style={{ fontSize: '1.8rem' }}>Good Afternoon, {currentUser ? currentUser.name : 'Staff Member'}!</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem' }}>

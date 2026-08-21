@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
-import { Package, Plus, Search, Sliders, Trash2, AlertTriangle, Upload, FileText, Download, CheckCircle, RefreshCw, X, Edit3 } from 'lucide-react';
+import { Package, Plus, Search, Sliders, Trash2, Upload, Download, CheckCircle, RefreshCw, X, Edit3 } from 'lucide-react';
 
 export const InventoryDashboard = () => {
   const { selectedRestaurant, addToast, requestConfirm } = useAuth();

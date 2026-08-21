@@ -11,9 +11,6 @@ import {
   X,
   CheckCircle,
   Trash2,
-  Utensils,
-  IndianRupee,
-  AlertTriangle,
   Printer,
   Sparkles,
   Loader2,
@@ -417,7 +414,6 @@ export const TableManagement = () => {
   const handleCheckoutTableBill = async (tableId) => {
     const tableObj = tables.find(t => t.id === tableId) || selectedTable;
     const currentBill = liveBills[tableId];
-    const totalDue = currentBill ? parseFloat(currentBill.total_amount || 0) : 0;
 
     setCheckingOut(true);
     try {

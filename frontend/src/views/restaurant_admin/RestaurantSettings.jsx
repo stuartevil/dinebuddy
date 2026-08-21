@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Settings, Store, FileText, Percent, CreditCard, Bell, Save, Lock, Upload, ImageIcon, X } from 'lucide-react';
+import { Settings, Store, Percent, CreditCard, Bell, Save, Lock, Upload, ImageIcon, X } from 'lucide-react';
 import { api, getMediaUrl } from '../../services/apiClient';
 
 export const RestaurantSettings = () => {

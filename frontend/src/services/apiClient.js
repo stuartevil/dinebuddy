@@ -41,17 +41,6 @@ client.interceptors.response.use(
   }
 );
 
-// Real Database State (Starts completely empty when database tables are empty)
-export const DEMO_DATA = {
-  restaurants: [],
-  ingredients: [],
-  transactions: [],
-  menuItems: [],
-  recipes: [],
-  tables: [],
-  orders: [],
-};
-
 export const api = client;
 
 /**

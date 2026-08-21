@@ -1,11 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { DEMO_DATA } from '../../services/apiClient';
-import { AlertTriangle, Plus, ShoppingCart, CheckCircle2 } from 'lucide-react';
+import { api } from '../../services/apiClient';
+import { AlertTriangle, Plus, ShoppingCart, CheckCircle2, Loader2 } from 'lucide-react';
 
 export const LowStockAlertCenter = ({ setActiveRoute }) => {
-  const { addToast } = useAuth();
-  const alertItems = DEMO_DATA.ingredients.filter(i => i.is_low_stock || i.is_out_of_stock);
+  const { selectedRestaurant, addToast } = useAuth();
+  const [alertItems, setAlertItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!selectedRestaurant) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    api.get(`/restaurants/${selectedRestaurant.id}/inventory/ingredients`, {
+      params: { low_stock_only: true }
+    })
+      .then(res => {
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        setAlertItems(list);
+      })
+      .catch(err => {
+        console.error("Failed to fetch low stock alerts:", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [selectedRestaurant]);
 
   const handlePurchase = (name) => {
     addToast('success', 'Purchase Order Created', `Purchase order PO-NEW generated for ${name}!`);
@@ -24,7 +46,12 @@ export const LowStockAlertCenter = ({ setActiveRoute }) => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {alertItems.length === 0 ? (
+        {loading ? (
+          <div className="panel-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 0.75rem auto' }} />
+            Checking live inventory stock levels...
+          </div>
+        ) : alertItems.length === 0 ? (
           <div className="panel-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--success)' }}>
             <CheckCircle2 size={40} style={{ margin: '0 auto 0.75rem auto' }} />
             <h3>All Ingredients Sufficiently Stocked! 🎉</h3>

@@ -32,6 +32,27 @@ const ShellContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Default route resolver by role
+  const getDefaultRoute = () => {
+    switch (activeRole) {
+      case ROLES.SUPERADMIN:
+        return '/admin/dashboard';
+      case ROLES.RESTAURANT_ADMIN:
+        return '/restaurant/dashboard';
+      case ROLES.RESTAURANT_STAFF:
+        return '/staff/dashboard';
+      default:
+        return '/restaurant/dashboard';
+    }
+  };
+
+  // Redirect root or invalid routes when logged in
+  useEffect(() => {
+    if (currentUser && location.pathname === '/') {
+      navigate(getDefaultRoute(), { replace: true });
+    }
+  }, [currentUser, activeRole, location.pathname]);
+
   // Public routes check (Customer QR Menu)
   const isCustomerPublicRoute = 
     location.pathname.startsWith('/order/') || 
@@ -53,28 +74,6 @@ const ShellContent = () => {
   const handleNavigate = (path) => {
     navigate(path);
   };
-
-
-  // Default route resolver by role
-  const getDefaultRoute = () => {
-    switch (activeRole) {
-      case ROLES.SUPERADMIN:
-        return '/admin/dashboard';
-      case ROLES.RESTAURANT_ADMIN:
-        return '/restaurant/dashboard';
-      case ROLES.RESTAURANT_STAFF:
-        return '/staff/dashboard';
-      default:
-        return '/restaurant/dashboard';
-    }
-  };
-
-  // Redirect root or invalid routes when logged in
-  useEffect(() => {
-    if (currentUser && location.pathname === '/') {
-      navigate(getDefaultRoute(), { replace: true });
-    }
-  }, [currentUser, activeRole, location.pathname]);
 
   // Not authenticated → render Login Screen
   if (!currentUser) {

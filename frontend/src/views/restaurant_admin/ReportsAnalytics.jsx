@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
-import { BarChart3, FileSpreadsheet, TrendingUp, IndianRupee, AlertCircle } from 'lucide-react';
+import { FileSpreadsheet, TrendingUp } from 'lucide-react';
 
 export const ReportsAnalytics = () => {
   const { selectedRestaurant, addToast } = useAuth();
