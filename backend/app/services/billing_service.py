@@ -36,8 +36,9 @@ class BillingService:
             db.query(TableSession)
             .filter(
                 TableSession.table_id == table_id,
-                TableSession.status == SessionStatus.OPEN
+                TableSession.status.in_([SessionStatus.OPEN, SessionStatus.PAYMENT_PENDING, "open", "payment_pending"])
             )
+            .order_by(TableSession.opened_at.desc(), TableSession.id.desc())
             .first()
         )
 
@@ -234,20 +235,30 @@ class BillingService:
 
     @staticmethod
     def get_live_bill_summary(db: Session, table_id: int) -> LiveBillSummary:
-        session = BillingService.get_active_session_for_table(db, table_id)
-        if not session:
-            table = db.query(RestaurantTable).filter(RestaurantTable.id == table_id).first()
-            if not table:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Restaurant table not found."
-                )
+        table = db.query(RestaurantTable).filter(RestaurantTable.id == table_id).first()
+        if not table:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"No active running bill/session on table '{table.table_number}'."
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Restaurant table not found."
             )
 
-        table = session.table
+        session = BillingService.get_active_session_for_table(db, table_id)
+        if not session:
+            return LiveBillSummary(
+                session_id=0,
+                table_id=table.id,
+                table_number=table.table_number,
+                status=SessionStatus.OPEN,
+                total_orders_count=0,
+                items_summary=[],
+                subtotal=0.0,
+                tax=0.0,
+                discount=0.0,
+                round_off=0.0,
+                total_amount=0.0,
+                opened_at=datetime.utcnow()
+            )
+
         orders = (
             db.query(Order)
             .filter(
@@ -261,23 +272,26 @@ class BillingService:
         items_map = {}
         for order in orders:
             for item in order.items:
+                menu_item = item.menu_item or db.query(MenuItem).filter(MenuItem.id == item.menu_item_id).first()
+                item_name = menu_item.name if menu_item else f"Item #{item.menu_item_id}"
+                variant_name = item.variant.name if (item.variant_id and item.variant) else None
                 key = (item.menu_item_id, item.variant_id, item.special_instructions or "")
                 if key not in items_map:
                     items_map[key] = {
                         "menu_item_id": item.menu_item_id,
-                        "item_name": item.menu_item.name if item.menu_item else "Unknown Item",
-                        "variant_name": item.variant.name if item.variant else None,
+                        "item_name": item_name,
+                        "variant_name": variant_name,
                         "quantity": 0,
-                        "unit_price": item.unit_price,
+                        "unit_price": float(item.unit_price or 0.0),
                         "total_price": 0.0,
                         "special_instructions": item.special_instructions
                     }
                 items_map[key]["quantity"] += item.quantity
-                items_map[key]["total_price"] = round(items_map[key]["total_price"] + item.total_price, 2)
+                items_map[key]["total_price"] = round(items_map[key]["total_price"] + float(item.total_price or 0.0), 2)
 
         items_summary = [LiveBillItemSummary(**val) for val in items_map.values()]
-        raw_total = max(0.0, session.subtotal - session.discount) + session.tax
-        round_off = round(session.total_amount - raw_total, 2)
+        raw_total = max(0.0, float(session.subtotal or 0.0) - float(session.discount or 0.0)) + float(session.tax or 0.0)
+        round_off = round(float(session.total_amount or 0.0) - raw_total, 2)
 
         return LiveBillSummary(
             session_id=session.id,
@@ -286,27 +300,37 @@ class BillingService:
             status=session.status,
             total_orders_count=len(orders),
             items_summary=items_summary,
-            subtotal=session.subtotal,
-            tax=session.tax,
-            discount=session.discount,
+            subtotal=float(session.subtotal or 0.0),
+            tax=float(session.tax or 0.0),
+            discount=float(session.discount or 0.0),
             round_off=round_off,
-            total_amount=session.total_amount,
-            opened_at=session.opened_at
+            total_amount=float(session.total_amount or 0.0),
+            opened_at=session.opened_at or datetime.utcnow()
         )
 
     @staticmethod
     def checkout_and_close_session(db: Session, table_id: int, checkout_data: CheckoutRequest) -> TableSession:
+        table = db.query(RestaurantTable).filter(RestaurantTable.id == table_id).first()
+        if not table:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Restaurant table not found."
+            )
+
         session = BillingService.get_active_session_for_table(db, table_id)
         if not session:
-            table = db.query(RestaurantTable).filter(RestaurantTable.id == table_id).first()
-            if not table:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Restaurant table not found."
-                )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"No active running session to checkout for table '{table.table_number}'."
+            table.status = TableStatus.AVAILABLE
+            db.commit()
+            return TableSession(
+                restaurant_id=table.restaurant_id,
+                table_id=table.id,
+                status=SessionStatus.PAID,
+                subtotal=0.0,
+                tax=0.0,
+                discount=0.0,
+                total_amount=0.0,
+                opened_at=datetime.utcnow(),
+                closed_at=datetime.utcnow()
             )
 
         if checkout_data.discount is not None:
@@ -320,7 +344,7 @@ class BillingService:
         session.closed_at = datetime.utcnow()
 
         # Reset table status back to AVAILABLE
-        table = session.table
+        table = session.table or table
         table.status = TableStatus.AVAILABLE
 
         db.commit()

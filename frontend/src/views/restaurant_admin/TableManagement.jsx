@@ -64,12 +64,7 @@ export const TableManagement = () => {
         setLiveBills(prev => ({ ...prev, [tableId]: res.data }));
       }
     } catch {
-      // No active session or table available
-      setLiveBills(prev => {
-        const copy = { ...prev };
-        delete copy[tableId];
-        return copy;
-      });
+      // Keep existing or empty gracefully
     } finally {
       if (showSpinner) setLoadingTableBill(false);
     }
@@ -124,9 +119,7 @@ export const TableManagement = () => {
               .catch(() => { })
           )
         );
-        setLiveBills(billsMap);
-      } else {
-        setLiveBills({});
+        setLiveBills(prev => ({ ...prev, ...billsMap }));
       }
     } catch (err) {
       console.error("Failed to fetch tables/menu:", err);
@@ -135,7 +128,7 @@ export const TableManagement = () => {
     }
   };
 
-  // Live Auto-Polling every 5 seconds for Real-Time synchronization
+  // Live Auto-Polling every 5 seconds for Real-Time table synchronization
   useEffect(() => {
     fetchTablesAndMenu(true);
 
@@ -146,12 +139,22 @@ export const TableManagement = () => {
     return () => clearInterval(interval);
   }, [selectedRestaurant]);
 
+  // Live auto-polling for open modal table bill (every 3 seconds)
+  useEffect(() => {
+    if (!selectedTable?.id) return;
+    fetchTableLiveBill(selectedTable.id, false);
+
+    const interval = setInterval(() => {
+      fetchTableLiveBill(selectedTable.id, false);
+    }, 3000); // 3 sec live polling for open table modal
+
+    return () => clearInterval(interval);
+  }, [selectedTable?.id]);
+
   // When a table is selected, load its live bill immediately
   const handleSelectTable = (tbl) => {
     setSelectedTable(tbl);
-    if (tbl.status === 'occupied') {
-      fetchTableLiveBill(tbl.id, true);
-    }
+    fetchTableLiveBill(tbl.id, true);
   };
 
   // Create new Table in DB
@@ -226,7 +229,7 @@ export const TableManagement = () => {
       });
 
       addToast('success', 'Item Added to Bill', `${qty}x ${item.name} added to ${selectedTable.table_number}`);
-      await fetchTableLiveBill(selectedTable.id);
+      await fetchTableLiveBill(selectedTable.id, true);
       fetchTablesAndMenu(false);
     } catch (err) {
       addToast('error', 'Failed to Add Item', err?.response?.data?.detail || err.message);
@@ -311,7 +314,7 @@ export const TableManagement = () => {
       setSelectedAddons({});
       setCustomizingQty(1);
 
-      await fetchTableLiveBill(selectedTable.id);
+      await fetchTableLiveBill(selectedTable.id, true);
       fetchTablesAndMenu(false);
     } catch (err) {
       addToast('error', 'Failed to Add Item', err?.response?.data?.detail || err.message);
@@ -383,11 +386,11 @@ export const TableManagement = () => {
   const handleCheckoutTableBill = async (tableId) => {
     const tableObj = tables.find(t => t.id === tableId) || selectedTable;
     const currentBill = liveBills[tableId];
-    const totalDue = currentBill ? currentBill.total_amount : 0;
+    const totalDue = currentBill ? parseFloat(currentBill.total_amount || 0) : 0;
 
     setCheckingOut(true);
     try {
-      // Auto-print receipt
+      // Auto-print receipt if items exist
       if (currentBill && currentBill.items_summary && currentBill.items_summary.length > 0) {
         handlePrintTableBill(tableId);
       }
@@ -398,7 +401,7 @@ export const TableManagement = () => {
         payment_notes: 'Paid at counter'
       });
 
-      // Clear local live bill cache
+      // Clear local live bill cache for this table
       setLiveBills(prev => {
         const copy = { ...prev };
         delete copy[tableId];
@@ -408,7 +411,7 @@ export const TableManagement = () => {
       setSelectedTable(null);
       await fetchTablesAndMenu(false);
 
-      addToast('success', 'Bill Paid & Table Vacated!', `₹${totalDue.toFixed(2)} collected. Table ${tableObj?.table_number || ''} is now Available.`);
+      addToast('success', 'Table Vacated!', `Table ${tableObj?.table_number || ''} is now Available.`);
     } catch (err) {
       addToast('error', 'Checkout Failed', err?.response?.data?.detail || err.message);
     } finally {
@@ -420,7 +423,7 @@ export const TableManagement = () => {
   const getTableBillTotal = (tableId) => {
     const bill = liveBills[tableId];
     if (bill && bill.total_amount !== undefined) {
-      return parseFloat(bill.total_amount);
+      return parseFloat(bill.total_amount || 0);
     }
     return 0.0;
   };
@@ -542,9 +545,11 @@ export const TableManagement = () => {
                 </div>
 
                 {/* Orders count badge if occupied */}
-                {tbl.status === 'occupied' && ordersCount > 0 && (
-                  <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', marginBottom: '0.75rem', fontWeight: 700 }}>
-                    ⚡ {ordersCount} Active Order Round{ordersCount > 1 ? 's' : ''} ({billData?.items_summary?.length || 0} items)
+                {tbl.status === 'occupied' && (
+                  <div style={{ fontSize: '0.75rem', color: ordersCount > 0 ? 'var(--accent-primary)' : 'var(--text-muted)', marginBottom: '0.75rem', fontWeight: 700 }}>
+                    {ordersCount > 0
+                      ? `⚡ ${ordersCount} Active Round${ordersCount > 1 ? 's' : ''} (${billData?.items_summary?.length || 0} items)`
+                      : '⚡ Occupied Table'}
                   </div>
                 )}
 
@@ -567,7 +572,7 @@ export const TableManagement = () => {
                     className="btn btn-primary btn-sm"
                     style={{ justifyContent: 'center' }}
                   >
-                    <Receipt size={14} /> Select & Live Bill
+                    <Receipt size={14} /> View & Manage Live Bill
                   </button>
 
                   <button
@@ -632,7 +637,7 @@ export const TableManagement = () => {
             {/* Add Order Item Form for this Table */}
             <div style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
               <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Plus size={16} /> Add Order Dish to {selectedTable.table_number}
+                <Plus size={16} /> Add Dish to {selectedTable.table_number} Bill
               </h4>
               {menuItems.length === 0 ? (
                 <div style={{ fontSize: '0.8rem', color: 'var(--warning)' }}>
@@ -689,26 +694,36 @@ export const TableManagement = () => {
                   <Receipt size={16} color="var(--accent-primary)" />
                   <span>Real-Time Running Bill ({selectedItems.length} items)</span>
                 </h4>
-                {selectedItems.length > 0 && (
-                  <div style={{ display: 'flex', gap: '0.35rem' }}>
-                    <button
-                      onClick={() => handlePrintTableKOT(selectedTable.id)}
-                      className="btn btn-secondary btn-sm"
-                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
-                      title="Print KOT to Thermal Printer"
-                    >
-                      <Printer size={12} /> KOT
-                    </button>
-                    <button
-                      onClick={() => handlePrintTableBill(selectedTable.id)}
-                      className="btn btn-secondary btn-sm"
-                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
-                      title="Print Bill to Thermal Printer"
-                    >
-                      <Receipt size={12} /> Bill Slip
-                    </button>
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                  <button
+                    onClick={() => fetchTableLiveBill(selectedTable.id, true)}
+                    className="btn btn-secondary btn-sm"
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                    title="Refresh this Table's Bill"
+                  >
+                    <RefreshCw size={12} className={loadingTableBill ? "animate-spin" : ""} /> Sync
+                  </button>
+                  {selectedItems.length > 0 && (
+                    <>
+                      <button
+                        onClick={() => handlePrintTableKOT(selectedTable.id)}
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                        title="Print KOT to Thermal Printer"
+                      >
+                        <Printer size={12} /> KOT
+                      </button>
+                      <button
+                        onClick={() => handlePrintTableBill(selectedTable.id)}
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                        title="Print Bill Slip to Thermal Printer"
+                      >
+                        <Receipt size={12} /> Bill Slip
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {loadingTableBill ? (
@@ -717,8 +732,11 @@ export const TableManagement = () => {
                   Fetching live order ticket...
                 </div>
               ) : selectedItems.length === 0 ? (
-                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
-                  No active orders on this table yet. Place an order from Customer QR or add a dish above.
+                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <p style={{ margin: '0 0 0.5rem 0' }}>No dishes ordered yet for {selectedTable.table_number}.</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
+                    When a customer orders via QR code, dishes will automatically appear here live. Or add a dish above.
+                  </p>
                 </div>
               ) : (
                 selectedItems.map((item, idx) => (
@@ -749,8 +767,8 @@ export const TableManagement = () => {
               )}
             </div>
 
-            {/* Bill Summary & Pay Button */}
-            {currentSelectedBill && selectedItems.length > 0 && (
+            {/* Bill Summary & Pay / Vacate Buttons */}
+            {currentSelectedBill && selectedItems.length > 0 ? (
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   <span>Subtotal:</span>
@@ -788,6 +806,19 @@ export const TableManagement = () => {
                   )}
                 </button>
               </div>
+            ) : (
+              selectedTable.status === 'occupied' && (
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                  <button
+                    onClick={() => handleCheckoutTableBill(selectedTable.id)}
+                    disabled={checkingOut}
+                    className="btn btn-secondary"
+                    style={{ width: '100%', padding: '0.65rem', fontWeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    <CheckCircle size={16} /> Vacate / Reset Table to Available
+                  </button>
+                </div>
+              )
             )}
 
           </div>
