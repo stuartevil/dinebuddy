@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
 import { 
-  DollarSign, 
+  IndianRupee, 
   ShoppingBag, 
   TrendingUp, 
   AlertTriangle, 
@@ -88,7 +88,7 @@ export const OwnerDashboardHome = ({ setActiveRoute }) => {
             <div className="panel-card" style={{ padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                 <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>TODAY'S REVENUE</span>
-                <DollarSign size={20} color="var(--success)" />
+                <IndianRupee size={20} color="var(--success)" />
               </div>
               <div style={{ fontSize: '1.9rem', fontWeight: 800, marginTop: '0.5rem', color: 'var(--success)' }}>
                 ₹{todayRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -130,7 +130,7 @@ export const OwnerDashboardHome = ({ setActiveRoute }) => {
             <div className="panel-card" style={{ padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                 <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>GROSS PROFIT (COGS)</span>
-                <DollarSign size={20} color="var(--success)" />
+                <IndianRupee size={20} color="var(--success)" />
               </div>
               <div style={{ fontSize: '1.9rem', fontWeight: 800, marginTop: '0.5rem', color: 'var(--success)' }}>
                 ₹{grossProfit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}

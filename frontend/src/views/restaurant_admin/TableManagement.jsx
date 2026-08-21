@@ -12,12 +12,11 @@ import {
   CheckCircle,
   Trash2,
   Utensils,
-  DollarSign,
+  IndianRupee,
   AlertTriangle,
   Printer,
   Sparkles,
   Loader2,
-  RefreshCw,
   Search,
   ChevronDown,
   Check
@@ -492,14 +491,6 @@ export const TableManagement = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              onClick={() => fetchTablesAndMenu(false)}
-              className="btn btn-secondary"
-              title="Manual Sync Refresh"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-            >
-              <RefreshCw size={15} /> Sync Now
-            </button>
             <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
               <Plus size={16} /> Add New Table
             </button>
@@ -845,14 +836,6 @@ export const TableManagement = () => {
                   <span>Real-Time Running Bill ({selectedItems.length} items)</span>
                 </h4>
                 <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                  <button
-                    onClick={() => fetchTableLiveBill(selectedTable.id, true)}
-                    className="btn btn-secondary btn-sm"
-                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
-                    title="Refresh this Table's Bill"
-                  >
-                    <RefreshCw size={12} className={loadingTableBill ? "animate-spin" : ""} /> Sync
-                  </button>
                   {selectedItems.length > 0 && (
                     <>
                       <button
