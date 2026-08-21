@@ -261,14 +261,16 @@ class BillingService:
         items_map = {}
         for order in orders:
             for item in order.items:
-                key = (item.menu_item_id, item.variant_id)
+                key = (item.menu_item_id, item.variant_id, item.special_instructions or "")
                 if key not in items_map:
                     items_map[key] = {
+                        "menu_item_id": item.menu_item_id,
                         "item_name": item.menu_item.name if item.menu_item else "Unknown Item",
                         "variant_name": item.variant.name if item.variant else None,
                         "quantity": 0,
                         "unit_price": item.unit_price,
-                        "total_price": 0.0
+                        "total_price": 0.0,
+                        "special_instructions": item.special_instructions
                     }
                 items_map[key]["quantity"] += item.quantity
                 items_map[key]["total_price"] = round(items_map[key]["total_price"] + item.total_price, 2)

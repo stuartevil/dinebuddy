@@ -1,22 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/apiClient';
 import { printKOT, printBill } from '../../services/printService';
-import { 
-  QrCode, 
-  Plus, 
+import {
+  QrCode,
+  Plus,
   Minus,
-  Users, 
-  Receipt, 
-  X, 
-  CheckCircle, 
-  Trash2, 
-  Utensils, 
+  Users,
+  Receipt,
+  X,
+  CheckCircle,
+  Trash2,
+  Utensils,
   DollarSign,
   AlertTriangle,
   Printer,
   Sparkles,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 
 export const TableManagement = () => {
@@ -25,11 +26,12 @@ export const TableManagement = () => {
   const [tables, setTables] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [liveBills, setLiveBills] = useState({}); // { [tableId]: LiveBillSummary }
 
   // Selected table management modal state
   const [selectedTable, setSelectedTable] = useState(null);
+  const [loadingTableBill, setLoadingTableBill] = useState(false);
   const [qrModalTable, setQrModalTable] = useState(null);
-  const [tableOrders, setTableOrders] = useState({}); // { [tableId]: [ { cartItemId, id, name, price, qty, addonsTitle, note, selectedOpts } ] }
 
   // Add Table Modal state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -37,6 +39,8 @@ export const TableManagement = () => {
 
   // Add Order item state inside Selected Table Modal
   const [selectedItemForm, setSelectedItemForm] = useState({ item_id: '', qty: 1 });
+  const [addingOrder, setAddingOrder] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
 
   // Addon Customization Modal State for Table Management
   const [customizingDish, setCustomizingDish] = useState(null);
@@ -45,34 +49,110 @@ export const TableManagement = () => {
   const [customizingQty, setCustomizingQty] = useState(1);
   const [loadingAddons, setLoadingAddons] = useState(false);
 
-  // Fetch real tables and menu items from backend API
-  const fetchTablesAndMenu = () => {
-    if (!selectedRestaurant) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const restId = selectedRestaurant.id;
+  const selectedTableRef = useRef(selectedTable);
+  useEffect(() => {
+    selectedTableRef.current = selectedTable;
+  }, [selectedTable]);
 
-    Promise.all([
-      api.get(`/tables/restaurant/${restId}`).catch(() => ({ data: [] })),
-      api.get(`/restaurants/${restId}/menu-items/`).catch(() => ({ data: [] })),
-    ]).then(([tablesRes, menuRes]) => {
-      const tblList = Array.isArray(tablesRes.data) ? tablesRes.data : tablesRes.data?.data || [];
-      const itemList = Array.isArray(menuRes.data) ? menuRes.data : menuRes.data?.data || [];
-      setTables(tblList);
-      setMenuItems(itemList);
-      if (itemList.length > 0) {
-        setSelectedItemForm(f => ({ ...f, item_id: itemList[0].id }));
+  // Fetch live bill for a specific table
+  const fetchTableLiveBill = async (tableId, showSpinner = false) => {
+    if (!tableId) return;
+    if (showSpinner) setLoadingTableBill(true);
+    try {
+      const res = await api.get(`/tables/${tableId}/current-bill`);
+      if (res.data) {
+        setLiveBills(prev => ({ ...prev, [tableId]: res.data }));
       }
-    }).finally(() => {
-      setLoading(false);
-    });
+    } catch {
+      // No active session or table available
+      setLiveBills(prev => {
+        const copy = { ...prev };
+        delete copy[tableId];
+        return copy;
+      });
+    } finally {
+      if (showSpinner) setLoadingTableBill(false);
+    }
   };
 
+  // Fetch real tables, menu items, and live running bills from backend API
+  const fetchTablesAndMenu = async (isInitial = false) => {
+    if (!selectedRestaurant) {
+      if (isInitial) setLoading(false);
+      return;
+    }
+    if (isInitial) setLoading(true);
+    const restId = selectedRestaurant.id;
+
+    try {
+      const [tablesRes, menuRes] = await Promise.all([
+        api.get(`/tables/restaurant/${restId}`).catch(() => ({ data: [] })),
+        api.get(`/restaurants/${restId}/menu-items/`).catch(() => ({ data: [] })),
+      ]);
+
+      const tblList = Array.isArray(tablesRes.data) ? tablesRes.data : tablesRes.data?.data || [];
+      const itemList = Array.isArray(menuRes.data) ? menuRes.data : menuRes.data?.data || [];
+
+      setTables(tblList);
+      setMenuItems(itemList);
+
+      if (itemList.length > 0) {
+        setSelectedItemForm(f => ({
+          ...f,
+          item_id: f.item_id || itemList[0].id
+        }));
+      }
+
+      // Update selected table object reference if currently open
+      if (selectedTableRef.current) {
+        const updatedSelected = tblList.find(t => t.id === selectedTableRef.current.id);
+        if (updatedSelected) {
+          setSelectedTable(updatedSelected);
+        }
+      }
+
+      // Fetch running bills for all occupied tables
+      const occupiedTables = tblList.filter(t => t.status === 'occupied');
+      if (occupiedTables.length > 0) {
+        const billsMap = {};
+        await Promise.all(
+          occupiedTables.map(t =>
+            api.get(`/tables/${t.id}/current-bill`)
+              .then(res => {
+                if (res.data) billsMap[t.id] = res.data;
+              })
+              .catch(() => { })
+          )
+        );
+        setLiveBills(billsMap);
+      } else {
+        setLiveBills({});
+      }
+    } catch (err) {
+      console.error("Failed to fetch tables/menu:", err);
+    } finally {
+      if (isInitial) setLoading(false);
+    }
+  };
+
+  // Live Auto-Polling every 5 seconds for Real-Time synchronization
   useEffect(() => {
-    fetchTablesAndMenu();
+    fetchTablesAndMenu(true);
+
+    const interval = setInterval(() => {
+      fetchTablesAndMenu(false);
+    }, 5000); // 5 sec live sync
+
+    return () => clearInterval(interval);
   }, [selectedRestaurant]);
+
+  // When a table is selected, load its live bill immediately
+  const handleSelectTable = (tbl) => {
+    setSelectedTable(tbl);
+    if (tbl.status === 'occupied') {
+      fetchTableLiveBill(tbl.id, true);
+    }
+  };
 
   // Create new Table in DB
   const handleCreateTable = async (e) => {
@@ -82,13 +162,13 @@ export const TableManagement = () => {
     try {
       await api.post('/tables/', {
         restaurant_id: selectedRestaurant.id,
-        table_number: addForm.table_number,
+        table_number: addForm.table_number.trim(),
         capacity: Number(addForm.capacity) || 4,
       });
       addToast('success', 'Table Added', `"${addForm.table_number}" added to floor plan!`);
       setShowAddModal(false);
       setAddForm({ table_number: '', capacity: 4 });
-      fetchTablesAndMenu();
+      fetchTablesAndMenu(false);
     } catch (err) {
       addToast('error', 'Failed to Add Table', err?.response?.data?.detail || err.message);
     }
@@ -103,6 +183,7 @@ export const TableManagement = () => {
         setSelectedTable(prev => ({ ...prev, status: newStatus }));
       }
       addToast('info', 'Table Status Updated', `Table status set to ${newStatus}`);
+      fetchTablesAndMenu(false);
     } catch (err) {
       addToast('error', 'Status Update Failed', err?.response?.data?.detail || err.message);
     }
@@ -121,7 +202,7 @@ export const TableManagement = () => {
           if (selectedTable && selectedTable.id === tableId) {
             setSelectedTable(null);
           }
-          fetchTablesAndMenu();
+          fetchTablesAndMenu(false);
         } catch (err) {
           addToast('error', 'Delete Failed', err?.response?.data?.detail || err.message);
         }
@@ -129,40 +210,29 @@ export const TableManagement = () => {
     });
   };
 
-  // Direct add helper for items without addons
-  const addItemToTableOrderDirect = (item, qty = 1) => {
+  // Direct add helper for items without addons (Database Persistent)
+  const addItemToTableOrderDirect = async (item, qty = 1) => {
     if (!selectedTable) return;
-    const itemPrice = parseFloat(item.price) || 0;
-    const cartItemId = `${item.id}`;
-
-    setTableOrders(prev => {
-      const currentList = prev[selectedTable.id] || [];
-      const existsIndex = currentList.findIndex(i => (i.cartItemId === cartItemId || i.id === item.id) && !i.addonsTitle);
-      let updated;
-      if (existsIndex >= 0) {
-        updated = currentList.map((i, idx) => idx === existsIndex ? { ...i, qty: i.qty + qty } : i);
-      } else {
-        updated = [
-          ...currentList,
+    setAddingOrder(true);
+    try {
+      await api.post(`/tables/${selectedTable.id}/orders`, {
+        items: [
           {
-            cartItemId,
-            id: item.id,
-            name: item.name,
-            price: itemPrice,
-            qty,
-            addonsTitle: '',
-            note: ''
+            menu_item_id: item.id,
+            quantity: qty,
+            special_instructions: null
           }
-        ];
-      }
-      return { ...prev, [selectedTable.id]: updated };
-    });
+        ]
+      });
 
-    if (selectedTable.status !== 'occupied') {
-      handleUpdateStatus(selectedTable.id, 'occupied');
+      addToast('success', 'Item Added to Bill', `${qty}x ${item.name} added to ${selectedTable.table_number}`);
+      await fetchTableLiveBill(selectedTable.id);
+      fetchTablesAndMenu(false);
+    } catch (err) {
+      addToast('error', 'Failed to Add Item', err?.response?.data?.detail || err.message);
+    } finally {
+      setAddingOrder(false);
     }
-
-    addToast('success', 'Item Added to Table Order', `${qty}x ${item.name} added to ${selectedTable.table_number}`);
   };
 
   // Add Item / Open Customization when clicking Add to Bill
@@ -180,7 +250,6 @@ export const TableManagement = () => {
 
     setLoadingAddons(true);
     try {
-      // Check if dish has attached add-on groups
       const res = await api.get(`/restaurants/${selectedRestaurant.id}/menu-items/${item.id}/addon-groups`);
       const rawGroups = Array.isArray(res.data) ? res.data : (res.data?.data || []);
       const groups = rawGroups.filter(g => g && g.is_active && Array.isArray(g.options) && g.options.length > 0);
@@ -191,7 +260,6 @@ export const TableManagement = () => {
         setCustomizingGroups(groups);
         setCustomizingQty(qty);
 
-        // Pre-select default options if min_selectable > 0
         const init = {};
         groups.forEach(g => {
           if (g.min_selectable > 0 && Array.isArray(g.options) && g.options.length > 0) {
@@ -202,159 +270,159 @@ export const TableManagement = () => {
         });
         setSelectedAddons(init);
       } else {
-        // Simple item without add-ons -> add directly
-        addItemToTableOrderDirect(item, qty);
+        // Simple item without add-ons -> add directly to backend DB session
+        await addItemToTableOrderDirect(item, qty);
       }
     } catch (err) {
       console.error("Error fetching add-ons for table order:", err);
-      addItemToTableOrderDirect(item, qty);
+      await addItemToTableOrderDirect(item, qty);
     } finally {
       setLoadingAddons(false);
     }
   };
 
-  // Confirm and Add Customized Item with Add-ons to Table Order
-  const handleConfirmTableCustomization = () => {
+  // Confirm and Add Customized Item with Add-ons to Backend Table Order
+  const handleConfirmTableCustomization = async () => {
     if (!customizingDish || !selectedTable) return;
 
-    const basePrice = parseFloat(customizingDish.price || 0);
     const selectedOpts = Object.values(selectedAddons || {}).flat().filter(Boolean);
-    const addonsPrice = selectedOpts.reduce((sum, o) => sum + (parseFloat(o?.price || 0)), 0);
-    const unitPrice = basePrice + addonsPrice;
-    
-    // Format add-ons title with individual prices
     const addonsDetails = selectedOpts.map(o => {
       const p = parseFloat(o?.price || 0);
       return p > 0 ? `${o?.name} (+₹${p.toFixed(2)})` : o?.name;
     }).filter(Boolean).join(', ');
 
-    const cartItemId = `${customizingDish.id}-${selectedOpts.map(o => o?.id).sort().join('-')}`;
+    const combinedNote = addonsDetails ? `Add-ons: ${addonsDetails}` : null;
 
-    setTableOrders(prev => {
-      const currentList = prev[selectedTable.id] || [];
-      const existsIndex = currentList.findIndex(i => i.cartItemId === cartItemId || (i.id === customizingDish.id && i.addonsTitle === (addonsDetails ? `(${addonsDetails})` : '')));
-      let updated;
-      if (existsIndex >= 0) {
-        updated = currentList.map((i, idx) => idx === existsIndex ? { ...i, qty: i.qty + customizingQty } : i);
-      } else {
-        updated = [
-          ...currentList,
+    setAddingOrder(true);
+    try {
+      await api.post(`/tables/${selectedTable.id}/orders`, {
+        items: [
           {
-            cartItemId,
-            id: customizingDish.id,
-            name: customizingDish.name,
-            basePrice,
-            addonsPrice,
-            price: unitPrice,
-            qty: customizingQty,
-            addonsTitle: addonsDetails ? `(${addonsDetails})` : '',
-            note: addonsDetails ? `Add-ons: ${addonsDetails}` : '',
-            selectedOpts: selectedOpts.map(o => ({ id: o.id, name: o.name, price: parseFloat(o.price || 0) }))
+            menu_item_id: customizingDish.id,
+            quantity: customizingQty,
+            special_instructions: combinedNote
           }
-        ];
-      }
-      return { ...prev, [selectedTable.id]: updated };
-    });
+        ]
+      });
 
-    if (selectedTable.status !== 'occupied') {
-      handleUpdateStatus(selectedTable.id, 'occupied');
+      addToast('success', 'Customized Item Added', `${customizingQty}x ${customizingDish.name} added to ${selectedTable.table_number}`);
+      setCustomizingDish(null);
+      setCustomizingGroups([]);
+      setSelectedAddons({});
+      setCustomizingQty(1);
+
+      await fetchTableLiveBill(selectedTable.id);
+      fetchTablesAndMenu(false);
+    } catch (err) {
+      addToast('error', 'Failed to Add Item', err?.response?.data?.detail || err.message);
+    } finally {
+      setAddingOrder(false);
     }
-
-    addToast('success', 'Customized Item Added', `${customizingQty}x ${customizingDish.name} ${addonsDetails ? `(${addonsDetails})` : ''} added to ${selectedTable.table_number}`);
-    setCustomizingDish(null);
-    setCustomizingGroups([]);
-    setSelectedAddons({});
-    setCustomizingQty(1);
   };
 
-  // Remove Item from Table Order
-  const handleRemoveItemFromTableOrder = (tableId, cartItemId) => {
-    setTableOrders(prev => ({
-      ...prev,
-      [tableId]: (prev[tableId] || []).filter(i => (i.cartItemId || i.id) !== cartItemId),
-    }));
-  };
-
-  // Print KOT from Table Modal
+  // Print KOT from Live Table Modal
   const handlePrintTableKOT = (tableId) => {
     const tableObj = tables.find(t => t.id === tableId) || selectedTable;
-    const items = tableOrders[tableId] || [];
+    const currentBill = liveBills[tableId];
+    const items = currentBill?.items_summary || [];
+
     if (items.length === 0) {
-      addToast('warning', 'No Items', 'No items ordered on this table to print KOT.');
+      addToast('warning', 'No Items', 'No active ordered items on this table to print KOT.');
       return;
     }
+
     const orderData = {
       order_number: `KOT-${Date.now().toString().slice(-4)}`,
       table_number: tableObj?.table_number || 'Table',
-      created_at: new Date().toISOString(),
+      created_at: currentBill?.opened_at || new Date().toISOString(),
       items: items.map(i => ({
-        ...i,
-        quantity: i.qty,
-        special_instructions: i.note || i.addonsTitle || '',
-        selectedOpts: i.selectedOpts || []
+        name: i.item_name,
+        quantity: i.quantity,
+        special_instructions: i.special_instructions || (i.variant_name ? `Variant: ${i.variant_name}` : '')
       }))
     };
     printKOT(orderData, selectedRestaurant || {});
     addToast('info', 'KOT Sent to Printer', `Kitchen Order Ticket printed for ${tableObj?.table_number}`);
   };
 
-  // Print Bill from Table Modal
+  // Print Bill Slip from Live Table Modal
   const handlePrintTableBill = (tableId) => {
     const tableObj = tables.find(t => t.id === tableId) || selectedTable;
-    const items = tableOrders[tableId] || [];
+    const currentBill = liveBills[tableId];
+    const items = currentBill?.items_summary || [];
+
     if (items.length === 0) {
       addToast('warning', 'No Items', 'No items ordered on this table to print bill.');
       return;
     }
-    const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
-    const gst = subtotal * 0.05;
-    const total = subtotal + gst;
+
+    const subtotal = currentBill.subtotal || items.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0);
+    const gst = currentBill.tax || 0;
+    const total = currentBill.total_amount || (subtotal + gst);
 
     const billData = {
-      order_number: `BILL-${Date.now().toString().slice(-4)}`,
+      order_number: `BILL-${currentBill.session_id || Date.now().toString().slice(-4)}`,
       table_number: tableObj?.table_number || 'Table',
-      created_at: new Date().toISOString(),
+      created_at: currentBill.opened_at || new Date().toISOString(),
       items: items.map(i => ({
-        ...i,
-        quantity: i.qty,
-        special_instructions: i.note || i.addonsTitle || '',
-        selectedOpts: i.selectedOpts || []
+        name: i.item_name,
+        quantity: i.quantity,
+        price: i.unit_price,
+        special_instructions: i.special_instructions || (i.variant_name ? `Variant: ${i.variant_name}` : '')
       })),
       subtotal,
       gst,
       total,
-      payment_method: 'CASH / CARD',
+      payment_method: 'CASH / UPI',
       payment_status: 'PAID'
     };
     printBill(billData, selectedRestaurant || {});
   };
 
-  // Checkout and Pay Table Bill
-  const handleCheckoutTableBill = (tableId) => {
+  // Checkout, Pay Table Bill, and Vacate Table in DB
+  const handleCheckoutTableBill = async (tableId) => {
     const tableObj = tables.find(t => t.id === tableId) || selectedTable;
-    const items = tableOrders[tableId] || [];
-    const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
-    const total = subtotal * 1.05;
+    const currentBill = liveBills[tableId];
+    const totalDue = currentBill ? currentBill.total_amount : 0;
 
-    // Clear order for this table
-    setTableOrders(prev => {
-      const copy = { ...prev };
-      delete copy[tableId];
-      return copy;
-    });
+    setCheckingOut(true);
+    try {
+      // Auto-print receipt
+      if (currentBill && currentBill.items_summary && currentBill.items_summary.length > 0) {
+        handlePrintTableBill(tableId);
+      }
 
-    // Vacate table -> status available
-    handleUpdateStatus(tableId, 'available');
-    setSelectedTable(null);
+      await api.post(`/tables/${tableId}/checkout`, {
+        payment_method: 'CASH',
+        discount: 0.0,
+        payment_notes: 'Paid at counter'
+      });
 
-    addToast('success', 'Bill Paid & Table Vacated!', `₹${total.toFixed(2)} collected for ${tableObj?.table_number || 'Table'}`);
+      // Clear local live bill cache
+      setLiveBills(prev => {
+        const copy = { ...prev };
+        delete copy[tableId];
+        return copy;
+      });
+
+      setSelectedTable(null);
+      await fetchTablesAndMenu(false);
+
+      addToast('success', 'Bill Paid & Table Vacated!', `₹${totalDue.toFixed(2)} collected. Table ${tableObj?.table_number || ''} is now Available.`);
+    } catch (err) {
+      addToast('error', 'Checkout Failed', err?.response?.data?.detail || err.message);
+    } finally {
+      setCheckingOut(false);
+    }
   };
 
-  // Calculate bill total for a table
+  // Get live bill total for a table card
   const getTableBillTotal = (tableId) => {
-    const items = tableOrders[tableId] || [];
-    const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
-    return subtotal * 1.05; // including 5% GST
+    const bill = liveBills[tableId];
+    if (bill && bill.total_amount !== undefined) {
+      return parseFloat(bill.total_amount);
+    }
+    return 0.0;
   };
 
   const floorTables = tables.filter(t => !(t.table_number || '').toLowerCase().includes('takeaway'));
@@ -363,25 +431,44 @@ export const TableManagement = () => {
   const occupiedCount = floorTables.filter(t => t.status === 'occupied').length;
   const reservedCount = floorTables.filter(t => t.status === 'reserved').length;
 
+  const currentSelectedBill = selectedTable ? liveBills[selectedTable.id] : null;
+  const selectedItems = currentSelectedBill?.items_summary || [];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
+
       {/* Header */}
       <div className="panel-card" style={{ padding: '1.5rem', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(19, 27, 46, 0.85))' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <span className="badge badge-role" style={{ marginBottom: '0.5rem' }}>
-              🏪 {selectedRestaurant?.name || 'Restaurant'} • FLOOR PLAN & BILLING
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+              <span className="badge badge-role">
+                🏪 {selectedRestaurant?.name || 'Restaurant'} • LIVE FLOOR PLAN & BILLING
+              </span>
+              <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}></span>
+                AUTO-SYNC LIVE (5s)
+              </span>
+            </div>
             <h1 style={{ fontSize: '1.6rem' }}>Restaurant Tables & Floor Plan Management</h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-              Select any table box below to view running bill, add customized order items, or collect payment.
+              Real-time table tracking. Customer QR orders automatically reflect live on table cards without page refresh.
             </p>
           </div>
 
-          <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
-            <Plus size={16} /> Add New Table
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              onClick={() => fetchTablesAndMenu(false)}
+              className="btn btn-secondary"
+              title="Manual Sync Refresh"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <RefreshCw size={15} /> Sync Now
+            </button>
+            <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
+              <Plus size={16} /> Add New Table
+            </button>
+          </div>
         </div>
       </div>
 
@@ -400,7 +487,8 @@ export const TableManagement = () => {
 
       {loading ? (
         <div className="panel-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-          Loading floor plan tables from database...
+          <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 0.75rem auto' }} />
+          Loading real-time floor plan tables from database...
         </div>
       ) : floorTables.length === 0 ? (
         /* Empty State */
@@ -424,18 +512,21 @@ export const TableManagement = () => {
             else if (tbl.status === 'reserved') { statusBadge = 'badge-info'; border = 'rgba(59, 130, 246, 0.3)'; }
 
             const billTotal = getTableBillTotal(tbl.id);
+            const billData = liveBills[tbl.id];
+            const ordersCount = billData?.total_orders_count || (billTotal > 0 ? 1 : 0);
 
             return (
-              <div 
-                key={tbl.id} 
-                className="panel-card" 
-                onClick={() => setSelectedTable(tbl)}
-                style={{ 
-                  padding: '1.25rem', 
-                  borderColor: border, 
+              <div
+                key={tbl.id}
+                className="panel-card"
+                onClick={() => handleSelectTable(tbl)}
+                style={{
+                  padding: '1.25rem',
+                  borderColor: border,
                   cursor: 'pointer',
                   transition: 'transform 0.2s ease, border-color 0.2s ease',
                   boxShadow: selectedTable?.id === tbl.id ? '0 0 20px var(--accent-glow)' : 'none',
+                  position: 'relative'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
@@ -450,10 +541,17 @@ export const TableManagement = () => {
                   </span>
                 </div>
 
+                {/* Orders count badge if occupied */}
+                {tbl.status === 'occupied' && ordersCount > 0 && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', marginBottom: '0.75rem', fontWeight: 700 }}>
+                    ⚡ {ordersCount} Active Order Round{ordersCount > 1 ? 's' : ''} ({billData?.items_summary?.length || 0} items)
+                  </div>
+                )}
+
                 {/* QR Token Box & Sticker Button */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.72rem', marginBottom: '1rem' }}>
                   <span>QR: {tbl.qr_code_token || `TBL-${tbl.id}`}</span>
-                  <button 
+                  <button
                     onClick={(e) => { e.stopPropagation(); setQrModalTable(tbl); }}
                     className="btn btn-secondary btn-sm"
                     style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
@@ -464,17 +562,17 @@ export const TableManagement = () => {
 
                 {/* Manage & Delete Buttons */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.5rem' }}>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setSelectedTable(tbl); }}
-                    className="btn btn-primary btn-sm" 
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleSelectTable(tbl); }}
+                    className="btn btn-primary btn-sm"
                     style={{ justifyContent: 'center' }}
                   >
-                    <Receipt size={14} /> Select & Manage Order
+                    <Receipt size={14} /> Select & Live Bill
                   </button>
 
-                  <button 
+                  <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteTable(tbl.id, tbl.table_number); }}
-                    className="btn btn-danger btn-sm" 
+                    className="btn btn-danger btn-sm"
                     title="Delete Table"
                     style={{ padding: '0.4rem 0.6rem' }}
                   >
@@ -487,11 +585,11 @@ export const TableManagement = () => {
         </div>
       )}
 
-      {/* Selected Table Order & Billing Control Modal */}
+      {/* Selected Table Order & Live Billing Control Modal */}
       {selectedTable && (
         <div className="modal-backdrop">
-          <div className="modal-box" style={{ maxWidth: '640px' }}>
-            
+          <div className="modal-box" style={{ maxWidth: '660px', maxHeight: '90vh', overflowY: 'auto' }}>
+
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
               <div>
@@ -503,9 +601,9 @@ export const TableManagement = () => {
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <button 
-                  onClick={() => handleDeleteTable(selectedTable.id, selectedTable.table_number)} 
-                  className="btn btn-danger btn-sm" 
+                <button
+                  onClick={() => handleDeleteTable(selectedTable.id, selectedTable.table_number)}
+                  className="btn btn-danger btn-sm"
                   title="Delete Table"
                 >
                   <Trash2 size={14} /> Delete
@@ -542,8 +640,8 @@ export const TableManagement = () => {
                 </div>
               ) : (
                 <form onSubmit={handleAddItemToTableOrder} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <select 
-                    value={selectedItemForm.item_id} 
+                  <select
+                    value={selectedItemForm.item_id}
                     onChange={(e) => setSelectedItemForm({ ...selectedItemForm, item_id: e.target.value })}
                     className="select-control"
                     style={{ flex: 1, minWidth: '180px' }}
@@ -555,24 +653,24 @@ export const TableManagement = () => {
                     ))}
                   </select>
 
-                  <input 
-                    type="number" 
-                    min="1" 
-                    className="input-control" 
-                    style={{ width: '70px' }} 
-                    value={selectedItemForm.qty} 
-                    onChange={(e) => setSelectedItemForm({ ...selectedItemForm, qty: e.target.value })} 
+                  <input
+                    type="number"
+                    min="1"
+                    className="input-control"
+                    style={{ width: '70px' }}
+                    value={selectedItemForm.qty}
+                    onChange={(e) => setSelectedItemForm({ ...selectedItemForm, qty: e.target.value })}
                   />
 
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="btn btn-primary btn-sm"
-                    disabled={loadingAddons}
+                    disabled={loadingAddons || addingOrder}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                   >
-                    {loadingAddons ? (
+                    {loadingAddons || addingOrder ? (
                       <>
-                        <Loader2 size={14} className="animate-spin" /> Checking...
+                        <Loader2 size={14} className="animate-spin" /> Adding...
                       </>
                     ) : (
                       <>
@@ -584,13 +682,14 @@ export const TableManagement = () => {
               )}
             </div>
 
-            {/* Current Table Running Bill */}
+            {/* Current Real-Time Live Running Bill */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h4 style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Receipt size={16} color="var(--accent-primary)" /> Running Bill Items
+                  <Receipt size={16} color="var(--accent-primary)" />
+                  <span>Real-Time Running Bill ({selectedItems.length} items)</span>
                 </h4>
-                {tableOrders[selectedTable.id] && tableOrders[selectedTable.id].length > 0 && (
+                {selectedItems.length > 0 && (
                   <div style={{ display: 'flex', gap: '0.35rem' }}>
                     <button
                       onClick={() => handlePrintTableKOT(selectedTable.id)}
@@ -612,31 +711,38 @@ export const TableManagement = () => {
                 )}
               </div>
 
-              {(!tableOrders[selectedTable.id] || tableOrders[selectedTable.id].length === 0) ? (
+              {loadingTableBill ? (
+                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  <Loader2 size={18} className="animate-spin" style={{ margin: '0 auto 0.5rem auto' }} />
+                  Fetching live order ticket...
+                </div>
+              ) : selectedItems.length === 0 ? (
                 <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
-                  No items ordered for this table yet. Select a dish above to add to bill.
+                  No active orders on this table yet. Place an order from Customer QR or add a dish above.
                 </div>
               ) : (
-                tableOrders[selectedTable.id].map(item => (
-                  <div key={item.cartItemId || item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                selectedItems.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        <span>{item.name}</span>
-                        {item.addonsTitle && (
+                        <span>{item.item_name}</span>
+                        {item.variant_name && (
                           <span className="badge badge-info" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>
-                            ✨ {item.addonsTitle.replace(/^\(|\)$/g, '')}
+                            {item.variant_name}
+                          </span>
+                        )}
+                        {item.special_instructions && (
+                          <span className="badge badge-warning" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>
+                            ✨ {item.special_instructions}
                           </span>
                         )}
                       </div>
                       <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        {item.qty}x @ ₹{parseFloat(item.price || 0).toFixed(2)}
+                        {item.quantity}x @ ₹{parseFloat(item.unit_price || 0).toFixed(2)}
                       </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>₹{(parseFloat(item.price || 0) * item.qty).toFixed(2)}</span>
-                      <button onClick={() => handleRemoveItemFromTableOrder(selectedTable.id, item.cartItemId || item.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }} title="Remove Item">
-                        <Trash2 size={15} />
-                      </button>
+                      <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>₹{parseFloat(item.total_price || 0).toFixed(2)}</span>
                     </div>
                   </div>
                 ))
@@ -644,14 +750,42 @@ export const TableManagement = () => {
             </div>
 
             {/* Bill Summary & Pay Button */}
-            {tableOrders[selectedTable.id] && tableOrders[selectedTable.id].length > 0 && (
+            {currentSelectedBill && selectedItems.length > 0 && (
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: 'var(--success)' }}>
-                  <span>TOTAL DUE (incl 5% GST):</span>
-                  <span>₹{getTableBillTotal(selectedTable.id).toFixed(2)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  <span>Subtotal:</span>
+                  <span>₹{parseFloat(currentSelectedBill.subtotal || 0).toFixed(2)}</span>
                 </div>
-                <button onClick={() => handleCheckoutTableBill(selectedTable.id)} className="btn btn-success" style={{ width: '100%', padding: '0.85rem', fontWeight: 800, marginTop: '0.5rem' }}>
-                  <CheckCircle size={18} /> Pay Bill & Vacate Table
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  <span>GST Tax:</span>
+                  <span>₹{parseFloat(currentSelectedBill.tax || 0).toFixed(2)}</span>
+                </div>
+                {parseFloat(currentSelectedBill.discount || 0) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--success)' }}>
+                    <span>Discount:</span>
+                    <span>-₹{parseFloat(currentSelectedBill.discount || 0).toFixed(2)}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.15rem', fontWeight: 800, color: 'var(--success)', marginTop: '0.25rem' }}>
+                  <span>TOTAL DUE:</span>
+                  <span>₹{parseFloat(currentSelectedBill.total_amount || 0).toFixed(2)}</span>
+                </div>
+
+                <button
+                  onClick={() => handleCheckoutTableBill(selectedTable.id)}
+                  disabled={checkingOut}
+                  className="btn btn-success"
+                  style={{ width: '100%', padding: '0.85rem', fontWeight: 800, marginTop: '0.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  {checkingOut ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" /> Processing Payment...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle size={18} /> Pay Bill & Vacate Table
+                    </>
+                  )}
                 </button>
               </div>
             )}
@@ -698,17 +832,17 @@ export const TableManagement = () => {
                         const isChecked = groupSelected.some(o => o.id === opt.id);
 
                         return (
-                          <label 
-                            key={opt.id} 
-                            style={{ 
-                              fontSize: '0.82rem', 
-                              display: 'flex', 
-                              justifyContent: 'space-between', 
-                              alignItems: 'center', 
-                              padding: '0.5rem 0.75rem', 
-                              borderRadius: 'var(--radius-sm)', 
-                              background: isChecked ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-primary)', 
-                              border: isChecked ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', 
+                          <label
+                            key={opt.id}
+                            style={{
+                              fontSize: '0.82rem',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '0.5rem 0.75rem',
+                              borderRadius: 'var(--radius-sm)',
+                              background: isChecked ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-primary)',
+                              border: isChecked ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
                               cursor: 'pointer',
                               transition: 'all 0.15s ease'
                             }}
@@ -763,11 +897,20 @@ export const TableManagement = () => {
               <button
                 type="button"
                 onClick={handleConfirmTableCustomization}
+                disabled={addingOrder}
                 className="btn btn-primary"
                 style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
               >
-                <Plus size={16} />
-                <span>Add to Table • ₹{((parseFloat(customizingDish?.price || 0) + Object.values(selectedAddons || {}).flat().reduce((s, o) => s + (parseFloat(o?.price || 0)), 0)) * customizingQty).toFixed(2)}</span>
+                {addingOrder ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} />
+                    <span>Add to Table • ₹{((parseFloat(customizingDish?.price || 0) + Object.values(selectedAddons || {}).flat().reduce((s, o) => s + (parseFloat(o?.price || 0)), 0)) * customizingQty).toFixed(2)}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -893,7 +1036,7 @@ export const TableManagement = () => {
                     >
                       📋 Copy Customer Menu Link
                     </button>
-                    
+
                     <a
                       href={tableOrderUrl}
                       target="_blank"

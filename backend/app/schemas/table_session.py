@@ -42,6 +42,7 @@ class LiveBillItemSummary(BaseModel):
     quantity: int
     unit_price: float
     total_price: float
+    special_instructions: Optional[str] = None
 
 
 class LiveBillSummary(BaseModel):
