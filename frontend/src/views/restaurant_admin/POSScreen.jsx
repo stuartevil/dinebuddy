@@ -374,7 +374,7 @@ export const POSScreen = () => {
   const isDisableDefault = localStorage.getItem('dinebuddy_disable_default_menu_categories') === 'true';
 
   const visibleCategories = isDisableDefault
-    ? categories.filter(c => !c.is_global && c.restaurant_id !== null)
+    ? categories.filter(c => !c.is_global)
     : categories;
 
 

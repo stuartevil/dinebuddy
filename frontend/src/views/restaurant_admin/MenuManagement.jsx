@@ -468,9 +468,8 @@ export const MenuManagement = () => {
 
   const isDisableDefault = localStorage.getItem('dinebuddy_disable_default_menu_categories') === 'true';
 
-  // Only filter out global system default categories when setting is active; custom user categories remain ALWAYS visible!
   const visibleCategories = isDisableDefault
-    ? categories.filter(c => !c.is_global && c.restaurant_id !== null)
+    ? categories.filter(c => !c.is_global)
     : categories;
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
