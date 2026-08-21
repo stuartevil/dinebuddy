@@ -109,14 +109,6 @@ export const TableManagement = () => {
       setTables(tblList);
       setMenuItems(itemList);
 
-      if (itemList.length > 0 && !selectedItemForm.item_id) {
-        setSelectedItemForm(f => ({
-          ...f,
-          item_id: itemList[0].id
-        }));
-        setDishSearch(itemList[0].name);
-      }
-
       // Update selected table object reference if currently open
       if (selectedTableRef.current) {
         const updatedSelected = tblList.find(t => t.id === selectedTableRef.current.id);
@@ -174,10 +166,6 @@ export const TableManagement = () => {
   const handleSelectTable = (tbl) => {
     setSelectedTable(tbl);
     fetchTableLiveBill(tbl.id, true);
-    if (menuItems.length > 0 && !selectedItemForm.item_id) {
-      setSelectedItemForm({ item_id: menuItems[0].id, qty: 1 });
-      setDishSearch(menuItems[0].name);
-    }
   };
 
   // Create new Table in DB
@@ -252,6 +240,8 @@ export const TableManagement = () => {
       });
 
       addToast('success', 'Item Added to Bill', `${qty}x ${item.name} added to ${selectedTable.table_number}`);
+      setSelectedItemForm({ item_id: '', qty: 1 });
+      setDishSearch('');
       await fetchTableLiveBill(selectedTable.id, true);
       fetchTablesAndMenu(false);
     } catch (err) {
@@ -353,6 +343,8 @@ export const TableManagement = () => {
       setCustomizingGroups([]);
       setSelectedAddons({});
       setCustomizingQty(1);
+      setSelectedItemForm({ item_id: '', qty: 1 });
+      setDishSearch('');
 
       await fetchTableLiveBill(selectedTable.id, true);
       fetchTablesAndMenu(false);
